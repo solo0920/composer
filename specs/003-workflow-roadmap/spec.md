@@ -178,7 +178,10 @@ below it always agree.
   be reported in place with wording the user can act on, and the rest of the screen MUST
   still render.
 - The window is resized to a very narrow width. All three stages MUST remain present and
-  operable.
+  operable, since they share one bar with the file, status and save controls and must
+  wrap rather than overflow.
+- The window is narrow enough that the single bar wraps. The stages, the app name and
+  the save control MUST all remain reachable.
 - The user uses browser back or forward after changing stage. The behaviour MUST be
   predictable; either the stage change is reflected or it is not offered, and it MUST
   NOT leave the roadmap disagreeing with the content.
@@ -265,8 +268,9 @@ below it always agree.
   minutes, using only the stage indicator to move between stages.
 - **SC-003**: No screen state exists in which the highlighted stage disagrees with the
   content shown, verified across all end-to-end scenarios.
-- **SC-004**: Only one control group governs what is displayed; the number of competing
-  navigation controls is reduced to a single set of three.
+- **SC-004**: Only one control group governs what is displayed, and exactly one
+  top-level bar is present; the number of competing navigation controls is reduced to a
+  single set of three.
 - **SC-005**: All three stages remain operable by keyboard alone, with the active state
   perceivable without colour vision.
 - **SC-006**: Existing composer capability is regression-free: the layout stage retains

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /**
  * The critical user flow, end to end in a real browser:
@@ -7,19 +7,59 @@ import { expect, test } from '@playwright/test';
  *   -> runtime renderer -> live preview -> save -> reload -> still there
  */
 
+/** Selects a workflow stage through the roadmap, the only navigation control. */
+async function goToStage(page: Page, stage: 'binding' | 'layout' | 'preview'): Promise<void> {
+	await page.locator(`[data-testid="workflow-stage"][data-stage-id="${stage}"]`).click();
+	await expect(page.locator(`[data-testid="workflow-stage"][data-stage-id="${stage}"]`)).toHaveAttribute(
+		'aria-current',
+		'step'
+	);
+}
+
 test.beforeEach(async ({ page }) => {
 	await page.goto('/');
 	// Clear once, after the first load, so that a reload inside a test still
 	// exercises persistence rather than a freshly wiped store.
 	await page.evaluate(() => window.localStorage.clear());
 	await page.reload();
+
+	// Readiness gate: the header and roadmap render as soon as the composer is
+	// interactive. Waiting on stage-dependent content made this gate racy under
+	// parallel load, so the default stage is asserted by its own test.
+	await expect(page.getByTestId('composer-header')).toBeVisible();
+	await expect(page.getByTestId('workflow-roadmap')).toBeVisible();
+});
+
+test('opens on the UI Layout stage', async ({ page }) => {
+	// Data-model constraint: "Default on load and after a reload: `layout`".
+	await expect(page.locator('[data-testid="workflow-stage"][data-stage-id="layout"]')).toHaveAttribute(
+		'aria-current',
+		'step'
+	);
 	await expect(page.getByTestId('canvas-grid')).toBeVisible();
+});
+
+test('the roadmap is the only navigation control, inside one bar', async ({ page }) => {
+	// One top-level bar, with the stages inside it and nothing competing with it.
+	await expect(page.locator('header')).toHaveCount(1);
+	await expect(page.getByTestId('workflow-stage')).toHaveCount(3);
+
+	const header = page.getByTestId('composer-header');
+	await expect(header.locator('[data-testid="file-menu"]')).toBeVisible();
+	await expect(header.locator('[data-testid="workflow-roadmap"]')).toBeVisible();
+	await expect(header.locator('[data-testid="app-name"]')).toBeVisible();
+	await expect(header.locator('[data-testid="save"]')).toBeVisible();
+
+	// Selecting a stage moves the mark and the content together.
+	await goToStage(page, 'binding');
+	await expect(page.getByTestId('binding-panel')).toBeVisible();
+	await expect(page.getByTestId('canvas-grid')).toHaveCount(0);
 });
 
 test('renders the demo definition with live API data in Preview', async ({ page }) => {
 	await expect(page.locator('[data-testid="canvas-item"]')).toHaveCount(4);
 
-	await page.getByTestId('preview-toggle').click();
+	await goToStage(page, 'preview');
 	await expect(page.getByTestId('preview-title')).toHaveText('Customer Risk Dashboard');
 
 	// Data arrives over real HTTP from the mock SvelteKit endpoints.
@@ -63,7 +103,7 @@ test('adds a component, edits it, binds it to an API and previews the result', a
 	await expect(page.getByLabel('score')).toHaveValue('$.score');
 
 	// 5. The bound card shows real API data in Preview.
-	await page.getByTestId('preview-toggle').click();
+	await goToStage(page, 'preview');
 	const previewCard = page.locator(`[data-component-id="${addedId}"]`);
 	await expect(previewCard).toContainText('Bound Card');
 	await expect(previewCard).toContainText('27');
@@ -144,7 +184,7 @@ test('shows a readable binding error when the API request fails', async ({ page 
 		route.fulfill({ status: 500, body: '{"error":"boom"}' })
 	);
 
-	await page.getByTestId('preview-toggle').click();
+	await goToStage(page, 'preview');
 
 	await expect(page.getByTestId('binding-error')).toContainText(
 		'API request failed: GET /api/mock/customer/profile responded 500'
@@ -289,6 +329,7 @@ test('settings changes the grid width and the $context values', async ({ page })
 	await page.getByTestId('settings-name').fill('Risk Console');
 	await page.getByTestId('settings-columns').fill('6');
 	await page.getByTestId('settings-apply').click();
+	await expect(page.getByTestId('settings-dialog')).toBeHidden();
 
 	await expect(page.getByTestId('app-name')).toHaveText('Risk Console');
 	await expect(page.getByTestId('toolbar-message')).toContainText('Settings applied.');
@@ -301,12 +342,16 @@ test('settings changes the grid width and the $context values', async ({ page })
 	// Changing $context.customerId changes the data the mock API returns.
 	await page.getByTestId('file-menu').click();
 	await page.getByTestId('file-settings').click();
+	// Settle on the dialog before touching its fields: reopening it immediately
+	// after a previous dialog closed is a race under parallel load.
+	await expect(page.getByTestId('settings-dialog')).toBeVisible();
 	await page.getByTestId('settings-context-key').first().fill('customerId');
 	await page.getByTestId('settings-context-value').first().fill('CUST-1002');
 	await page.getByTestId('settings-apply').click();
+	await expect(page.getByTestId('settings-dialog')).toBeHidden();
 
 	await page.getByTestId('save').click();
-	await page.getByTestId('preview-toggle').click();
+	await goToStage(page, 'preview');
 	await expect(page.getByTestId('runtime-root')).toContainText('Grace Hopper');
 });
 
@@ -319,13 +364,13 @@ test('renders an empty app without crashing', async ({ page }) => {
 	await expect(page.getByTestId('canvas-grid')).toHaveCount(0);
 	await expect(page.getByText('Add one from the palette')).toBeVisible();
 
-	await page.getByTestId('preview-toggle').click();
+	await goToStage(page, 'preview');
 	await expect(page.getByTestId('preview-title')).toHaveText('Blank');
 	await expect(page.getByTestId('runtime-root')).toHaveCount(1);
 });
 
 test('lists e2e flows and their technology stacks', async ({ page }) => {
-	await page.getByTestId('view-binding').click();
+	await goToStage(page, 'binding');
 
 	await expect(page.getByTestId('binding-panel')).toBeVisible();
 	// Both demo flows, with every node listed.
@@ -345,7 +390,7 @@ test('lists e2e flows and their technology stacks', async ({ page }) => {
 });
 
 test('changing a node stack warns when the stack is not implemented', async ({ page }) => {
-	await page.getByTestId('view-binding').click();
+	await goToStage(page, 'binding');
 
 	// The render node offers only renderer stacks, from the Stack Registry.
 	const nodeRow = (id: string) =>
@@ -366,7 +411,7 @@ test('changing a node stack warns when the stack is not implemented', async ({ p
 	// The choice is stored on the app and survives a reload.
 	await page.getByTestId('save').click();
 	await page.reload();
-	await page.getByTestId('view-binding').click();
+	await goToStage(page, 'binding');
 	await expect(nodeRow('render-preview')).toContainText('json-render');
 
 	// A data node cannot be given a renderer stack.
@@ -376,13 +421,13 @@ test('changing a node stack warns when the stack is not implemented', async ({ p
 });
 
 test('a node stack choice does not affect the rendered preview', async ({ page }) => {
-	await page.getByTestId('view-binding').click();
+	await goToStage(page, 'binding');
 	await page.locator('[data-testid="flow-node"][data-node-id="render-preview"]').getByTestId('node-stack-select').click();
 	await page.locator('[data-testid="node-stack-option"][data-stack-id="json-render"]').click();
 	await expect(page.getByTestId('flow-blocking')).toBeVisible();
 
 	// The MVP still renders with Svelte, so live data is still correct.
-	await page.getByTestId('preview-toggle').click();
+	await goToStage(page, 'preview');
 	await expect(page.getByTestId('runtime-root')).toContainText('Ada Lovelace');
 });
 
@@ -475,7 +520,7 @@ test('composes a nested component tree like a JSON spec', async ({ page }) => {
 	await expect(childrenOf(nestedBoxId)).toHaveCount(1);
 
 	// And it renders in Preview at the same nesting.
-	await page.getByTestId('preview-toggle').click();
+	await goToStage(page, 'preview');
 	await expect(
 		page.locator(`[data-component-id="${boxId}"] > [data-testid="runtime-children"]`)
 	).toHaveCount(1);

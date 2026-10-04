@@ -76,6 +76,37 @@ describe('Composer: indicator and content always agree', () => {
 		expect(hasPreview(container)).toBe(false);
 	});
 
+	it('renders exactly one top-level bar containing both nav and header', () => {
+		const { container } = mount();
+		const header = container.querySelector('[data-testid="composer-header"]');
+
+		// One bar, not two stacked ones.
+		expect(container.querySelectorAll('header')).toHaveLength(1);
+		expect(header).not.toBeNull();
+
+		// The workflow stages live inside that same bar rather than in their own.
+		const roadmap = container.querySelector('[data-testid="workflow-roadmap"]');
+		expect(roadmap).not.toBeNull();
+		expect(header!.contains(roadmap!)).toBe(true);
+	});
+
+	it('keeps file, stage, status and save controls in the one bar', () => {
+		const { container } = mount();
+		const header = container.querySelector('[data-testid="composer-header"]')!;
+		for (const testId of ['file-menu', 'workflow-roadmap', 'app-name', 'save', 'reset']) {
+			expect(header.querySelector(`[data-testid="${testId}"]`), testId).not.toBeNull();
+		}
+	});
+
+	it('no longer offers a second control that duplicates the stage control', () => {
+		const { container } = mount();
+		// The pre-consolidation toggles are gone, so exactly one control group governs
+		// what the workspace shows (spec SC-004).
+		for (const removed of ['preview-toggle', 'view-binding', 'view-compose']) {
+			expect(container.querySelector(`[data-testid="${removed}"]`), removed).toBeNull();
+		}
+	});
+
 	it('marks exactly one stage as active', () => {
 		const { container } = mount();
 		expect(container.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
@@ -134,16 +165,10 @@ describe('Composer: indicator and content always agree', () => {
 		).toBe(true);
 	});
 
-	it('exposes the workflow roadmap above the toolbar controls', () => {
+	it('exposes the workflow stages as the only navigation control', () => {
 		const { container } = mount();
-		const roadmap = container.querySelector('[data-testid="workflow-roadmap"]');
-		const header = container.querySelector('header');
-		expect(roadmap).not.toBeNull();
-		expect(header).not.toBeNull();
-		// The roadmap must precede the toolbar in document order (FR-007).
-		expect(
-			roadmap!.compareDocumentPosition(header!) & Node.DOCUMENT_POSITION_FOLLOWING
-		).toBeTruthy();
+		// Stage selection happens only through the roadmap; nothing else competes.
+		expect(container.querySelectorAll('[data-testid="workflow-stage"]')).toHaveLength(3);
 	});
 });
 

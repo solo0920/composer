@@ -76,8 +76,8 @@ other means and confirm the mark follows.
 
 - [X] T012 [P] [US1] Create `src/lib/composer/workflow/WorkflowRoadmap.svelte` as a presentational component taking `stages` and `activeStage` props. It MUST render every stage in `order` and MUST NOT decide which content to show (contract section 4)
 - [X] T013 [US1] Render the active stage in `src/lib/composer/workflow/WorkflowRoadmap.svelte` using the native `aria-current` attribute in addition to visual distinction, per research R4, so the active state is perceivable without colour alone
-- [X] T014 [US1] Render `WorkflowRoadmap.svelte` in `src/lib/composer/Composer.svelte` above the existing toolbar controls, and pass `activeStage` through, satisfying FR-001 and FR-007
-- [X] T015 [US1] Confirm `src/lib/composer/workflow/WorkflowRoadmap.svelte` renders all three stages present and legible at narrow window widths when mounted from `src/lib/composer/Composer.svelte`, per FR-007 and quickstart Scenario 1
+- [X] T014 [US1] Render `WorkflowRoadmap.svelte` inside `src/lib/composer/Toolbar.svelte` so the stages sit in the single top-level bar beside the file, status and save controls, satisfying FR-001 and the amended FR-007 (see plan D1)
+- [X] T015 [US1] Confirm `src/lib/composer/workflow/WorkflowRoadmap.svelte` renders all three stages present and legible at narrow window widths when mounted from `src/lib/composer/Toolbar.svelte`, per FR-007 and quickstart Scenario 1
 
 **Checkpoint**: User Story 1 is functional and independently testable.
 
@@ -95,13 +95,13 @@ unsaved indicator stays accurate.
 ### Tests for User Story 2 ⚠️
 
 - [ ] T016 [P] [US2] Add integration tests to `src/lib/composer/Composer.svelte.test.ts` covering: selecting each stage changes the rendered content in the same transition; selecting the already-active stage changes nothing; unsaved edits survive a stage change and the dirty flag stays accurate
-- [ ] T017 [P] [US2] Migrate the end-to-end tests in `e2e/composer.spec.ts` that reference removed controls: 7 references to `preview-toggle` and 4 references to `view-binding` become roadmap stage selections. Preserve each test's original assertion; only the navigation path changes
+- [X] T017 [P] [US2] Migrate the end-to-end tests in `e2e/composer.spec.ts` that reference removed controls: 7 references to `preview-toggle` and 4 references to `view-binding` become roadmap stage selections via a shared `goToStage` helper. Preserve each test's original assertion; only the navigation path changes — completed early by the header merge, see plan D2
 
 ### Implementation for User Story 2
 
 - [ ] T018 [US2] Wire stage selection in `src/lib/composer/workflow/WorkflowRoadmap.svelte` to call an `onselect` callback, and wire that callback to `selectStage` in `src/lib/composer/Composer.svelte`
-- [ ] T019 [US2] Remove the `Compose`/`Binding` control group from `src/lib/composer/Toolbar.svelte`, since the `binding` and `layout` stages replace it (contract section 5)
-- [ ] T020 [US2] Remove the `Edit`/`Preview` control group from `src/lib/composer/Toolbar.svelte`, since the `layout` and `preview` stages replace it, and drop the now-unused `mode` prop
+- [X] T019 [US2] Remove the `Compose`/`Binding` control group from `src/lib/composer/Toolbar.svelte`, since the `binding` and `layout` stages replace it (contract section 5) — completed early by the header merge, see plan D2
+- [X] T020 [US2] Remove the `Edit`/`Preview` control group from `src/lib/composer/Toolbar.svelte`, since the `layout` and `preview` stages replace it, and drop the now-unused `mode` prop — completed early by the header merge, see plan D2
 - [ ] T021 [US2] Add cases to `src/lib/composer/Composer.svelte.test.ts` proving no stage change leaves a loading or error state visible on the abandoned stage, per FR-011, and that browser back and forward leave the indicator agreeing with the content, per FR-016 and research R5 (stage is deliberately not written to browser history, as the application has no router)
 - [ ] T022 [US2] Run `npm run check`, `npm run test`, `npm run build` and `npm run test:e2e`, confirming no previously passing test was removed or relaxed
 

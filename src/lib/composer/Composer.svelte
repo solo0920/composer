@@ -16,7 +16,6 @@ import type { StackRegistry } from '$lib/registry/stack-registry';
 import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 	import SettingsDialog from '../apps/SettingsDialog.svelte';
 	import Toolbar from './Toolbar.svelte';
-	import WorkflowRoadmap from './workflow/WorkflowRoadmap.svelte';
 	import { STAGES } from './stages';
 
 	/**
@@ -80,16 +79,11 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-	<!-- The roadmap is presentational: it reports the active stage and asks to change
-	     it. All stage-to-content mapping stays in the branch below, so the highlight
+	<!-- One top-level bar. The workflow stages render inline inside it, and all
+	     stage-to-content mapping stays in the branch below, so the highlighted stage
 	     cannot drift away from what is shown. -->
-	<WorkflowRoadmap
-		stages={STAGES}
-		activeStage={composer.activeStage}
-		onselect={(stage) => composer.selectStage(stage)}
-	/>
-
 	<Toolbar
+		stages={STAGES}
 		appName={definition.name}
 		activeStage={composer.activeStage}
 		layoutPresentation={composer.layoutPresentation}

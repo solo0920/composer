@@ -162,6 +162,50 @@ table is intentionally empty.
 
 ---
 
+## Declared Deviations
+
+Constitution rule 16 requires any departure from this plan or the specification to be
+written down with its reason and the trade-off accepted.
+
+### D1 - The roadmap is rendered inside the header, not above it
+
+**Plan and specification said**: FR-007 placed the stage indicator *above* the existing
+toolbar controls, implying two stacked bars. The first implementation created a separate
+`WorkflowRoadmap` bar between the window edge and the toolbar.
+
+**Changed to**: the stages render inline inside the single composer header, beside the
+file menu, app name, status message and save control.
+
+**Reason**: requested directly, and the two-bar result was poor. Two stacked bars of
+chrome duplicated navigation, and because the pre-consolidation `Compose`/`Binding` and
+`Edit`/`Preview` toggles were still present during the Foundational phase, the same
+navigation appeared twice in two places. Merging also satisfies SC-004 more strongly
+than a second bar could.
+
+**Trade-off accepted**: the roadmap is no longer a full-width band, so it reads as part
+of the header rather than as a distinct stepper. Stage order is carried by explicit
+numerals and separators instead of by spatial separation. In exchange there is one
+top-level bar, one navigation control, and no duplicated chrome.
+
+**Consequence**: `spec.md` FR-007, the baseline correction, SC-004 and one edge case
+were amended to match.
+
+### D2 - The legacy toggles were removed earlier than planned
+
+**Plan said**: T019 and T020 remove the `Compose`/`Binding` and `Edit`/`Preview` groups
+during User Story 2, after the roadmap existed.
+
+**Changed to**: they were removed as part of the header merge, because keeping them
+would have left two competing controls inside the one bar.
+
+**Reason**: same as D1. Merging while the duplicates remained was not shippable.
+
+**Trade-off accepted**: User Story 2's control removal landed during User Story 1. The
+eleven end-to-end references to the removed test ids were migrated in the same commit,
+so the suite stayed green and no test was deleted.
+
+---
+
 ## Post-Design Constitution Re-check
 
 Re-evaluated after Phase 1, as the gate requires.

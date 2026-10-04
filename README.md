@@ -49,15 +49,17 @@ without root, and `playwright.config.ts` puts that directory on
 ## What the MVP does
 
 1. Opens on a **Customer Risk Dashboard** demo (4 components, 3 live APIs).
-2. **File** menu: new app, open app, save, save as, export app, settings.
+2. One top bar: **File** menu (new app, open app, save, save as, export app,
+   settings) plus the workflow stages **1 Binding → 2 UI Layout → 3 Preview**,
+   with the active stage highlighted. It is the only navigation control.
 3. Left palette with **collapsible** Layout / Basic / Data groups.
 4. Middle canvas composes a **nested component tree** — select a Container, then
    keep clicking the palette to add children.
 5. Inspector edits props, column/span, and the API binding.
 6. **Binding** panel lists each e2e flow and lets every node pick its technology
    stack from a role-filtered dropdown.
-7. **Edit / Preview** toggle renders the same definition with real API data.
-8. **Visual / JSON** tabs; JSON edits go through the same validation.
+7. **Preview** stage renders the same definition with real API data.
+8. The layout stage offers **Visual / JSON**; JSON edits go through the same validation.
 9. Apps persist in a browser library; settings change grid width and the
    `$context` values bindings read.
 

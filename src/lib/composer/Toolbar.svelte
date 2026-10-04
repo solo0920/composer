@@ -1,13 +1,22 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs/index.js';
-	import type { LayoutPresentation, StageId } from './stages';
+	import type { LayoutPresentation, Stage, StageId } from './stages';
 	import FileMenu from '../apps/FileMenu.svelte';
+	import WorkflowRoadmap from './workflow/WorkflowRoadmap.svelte';
 
+	/**
+	 * The composer's single top-level bar.
+	 *
+	 * The workflow stages live inline here rather than in a second bar above it, and
+	 * the earlier `Compose`/`Binding` and `Edit`/`Preview` toggles are gone: they
+	 * duplicated the stage control. Exactly one control group now decides what the
+	 * workspace shows.
+	 */
 	let {
 		appName,
+		stages,
 		activeStage,
 		layoutPresentation,
 		dirty,
@@ -19,6 +28,7 @@
 		onfilecommand
 	}: {
 		appName: string;
+		stages: readonly Stage[];
 		activeStage: StageId;
 		layoutPresentation: LayoutPresentation;
 		dirty: boolean;
@@ -46,57 +56,31 @@
 			: 'text-destructive'
 	);
 
-	// True while the layout stage owns the presentation control, so it is never
-	// offered on a stage where it would have no effect.
+	// The presentation control only applies to the layout stage, so it is never
+	// offered where it would have no effect.
 	const showsLayoutPresentation = $derived(activeStage === 'layout');
 </script>
 
-<header class="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
+<header
+	class="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2"
+	data-testid="composer-header"
+>
 	<FileMenu disabled={!hasApp} oncommand={onfilecommand} />
 
-	<Separator orientation="vertical" class="h-5" />
+	<Separator orientation="vertical" class="mr-1 h-5" />
 
-	<div class="flex items-center gap-2">
-		<span class="text-sm font-semibold" data-testid="app-name">{appName}</span>
+	<WorkflowRoadmap {stages} {activeStage} onselect={onstagechange} />
+
+	<Separator orientation="vertical" class="ml-1 h-5" />
+
+	<div class="flex min-w-0 items-center gap-2">
+		<span class="truncate text-sm font-semibold" data-testid="app-name">{appName}</span>
 		{#if dirty}
 			<span
-				class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+				class="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
 				data-testid="dirty-flag">unsaved</span
 			>
 		{/if}
-	</div>
-
-	<!-- TEMPORARY SHIM (removed in User Story 2 and User Story 4). These controls
-	     predate the workflow roadmap and delegate to the same stage axis, so the
-	     application stays fully usable while the roadmap is built. -->
-	<div class="flex items-center gap-1" data-testid="legacy-mode-toggle">
-		<Button
-			size="sm"
-			variant={activeStage === 'preview' ? 'default' : 'outline'}
-			data-testid="preview-toggle"
-			onclick={() => onstagechange('preview')}
-		>
-			Preview
-		</Button>
-	</div>
-
-	<div class="flex items-center gap-1" data-testid="workspace-view">
-		<Button
-			size="sm"
-			variant={activeStage === 'binding' ? 'secondary' : 'ghost'}
-			data-testid="view-binding"
-			onclick={() => onstagechange('binding')}
-		>
-			Binding
-		</Button>
-		<Button
-			size="sm"
-			variant={activeStage === 'layout' ? 'secondary' : 'ghost'}
-			data-testid="view-compose"
-			onclick={() => onstagechange('layout')}
-		>
-			Compose
-		</Button>
 	</div>
 
 	{#if showsLayoutPresentation}
@@ -115,7 +99,13 @@
 		{#if message}
 			<span class="max-w-md truncate text-xs {messageTone}" data-testid="toolbar-message">{message}</span>
 		{/if}
-		<Button size="sm" variant="ghost" onclick={onreset} disabled={!hasApp}>Reset</Button>
+		<Button
+			size="sm"
+			variant="ghost"
+			onclick={onreset}
+			disabled={!hasApp}
+			data-testid="reset">Reset</Button
+		>
 		<Button size="sm" onclick={() => onfilecommand('save')} disabled={!hasApp} data-testid="save">Save</Button>
 	</div>
 </header>
