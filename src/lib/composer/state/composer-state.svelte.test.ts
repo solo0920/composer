@@ -318,6 +318,87 @@ it('drops a selection when a definition replacement removes that nested componen
 	});
 });
 
+describe('navigation state', () => {
+	it('defaults to the layout stage and the visual presentation', () => {
+		const state = makeState();
+		expect(state.activeStage).toBe('layout');
+		expect(state.layoutPresentation).toBe('visual');
+	});
+
+	it('accepts each of the three declared stages', () => {
+		const state = makeState();
+		for (const stage of ['binding', 'layout', 'preview'] as const) {
+			state.selectStage(stage);
+			expect(state.activeStage).toBe(stage);
+		}
+	});
+
+	it('ignores an unknown stage rather than half-applying it', () => {
+		const state = makeState();
+		state.selectStage('preview');
+		// Forced past the type system to prove runtime guarding.
+		state.selectStage('render' as Parameters<typeof state.selectStage>[0]);
+		expect(state.activeStage).toBe('preview');
+	});
+
+	it('never writes navigation state into the screen definition', () => {
+		const state = makeState();
+		state.addComponent('text');
+		const before = JSON.stringify(state.definition);
+
+		state.selectStage('preview');
+		state.setLayoutPresentation('json');
+
+		expect(JSON.stringify(state.definition)).toBe(before);
+		expect(JSON.stringify(state.definition)).not.toContain('activeStage');
+		expect(JSON.stringify(state.definition)).not.toContain('layoutPresentation');
+	});
+
+	it('never marks the definition dirty, because navigation is not an edit', () => {
+		const state = makeState();
+		state.markSaved();
+		state.selectStage('preview');
+		state.setLayoutPresentation('json');
+		expect(state.dirty).toBe(false);
+	});
+
+	it('preserves the layout presentation across every stage change', () => {
+		const state = makeState();
+		state.setLayoutPresentation('json');
+
+		for (const stage of ['binding', 'preview', 'layout', 'binding'] as const) {
+			state.selectStage(stage);
+			expect(state.layoutPresentation).toBe('json');
+		}
+	});
+
+	it('keeps the active stage when the definition is replaced or reset', () => {
+		const state = makeState();
+		state.selectStage('preview');
+		state.setDefinition({
+			id: 'def-x',
+			version: 1,
+			name: 'X',
+			layout: { type: 'grid', columns: 12 },
+			components: []
+		});
+		expect(state.activeStage).toBe('preview');
+	});
+
+	it('preserves unsaved edits across a stage change', () => {
+		const state = makeState();
+		const instance = state.addComponent('text')!;
+		state.updateProps(instance.id, { text: 'Kept' });
+		expect(state.dirty).toBe(true);
+
+		state.selectStage('preview');
+		state.selectStage('layout');
+
+		expect(state.dirty).toBe(true);
+		expect(state.definition.components[0].props['text']).toBe('Kept');
+	});
+});
+
 describe('toJson', () => {
 	it('serialises the definition as indented JSON', () => {
 		const state = makeState();

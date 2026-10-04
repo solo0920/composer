@@ -2,6 +2,13 @@ import type { ComponentRegistry } from '../../registry/component-registry';
 import type { ApiRegistry } from '../../registry/api-registry';
 import type { BindingDefinition } from '../../domain/bindings/binding-definition';
 import type { JsonObject } from '../../domain/json';
+import {
+	DEFAULT_LAYOUT_PRESENTATION,
+	DEFAULT_STAGE,
+	toStageId,
+	type LayoutPresentation,
+	type StageId
+} from '../stages';
 import type { ComponentLayout, UIDefinition, UIComponentInstance } from '../../domain/definitions/ui-definition';
 import {
 	appendComponent,
@@ -14,9 +21,6 @@ import {
 	updateProps
 } from '../../domain/definitions/ui-definition.factory';
 
-export type ComposerMode = 'edit' | 'preview';
-export type ComposerView = 'visual' | 'json';
-
 let idCounter = 0;
 function nextId(prefix: string): string {
 	idCounter += 1;
@@ -27,21 +31,39 @@ function nextId(prefix: string): string {
  * Composer state.
  *
  * `definition` is the single source of truth shared with the Runtime
- * Renderer — the Composer never keeps a second copy. Selection, mode, view and
- * dirty-flag are Composer UI state and deliberately live here, outside the
- * domain model.
+ * Renderer — the Composer never keeps a second copy. Selection, the active
+ * stage, the layout presentation and the dirty-flag are Composer UI state and
+ * deliberately live here, outside the domain model.
  */
 export class ComposerState {
 	definition = $state<UIDefinition>(createUIDefinition('Untitled', nextId('def')));
 	selectedComponentId = $state<string | null>(null);
-	mode = $state<ComposerMode>('edit');
-	view = $state<ComposerView>('visual');
+	/**
+	 * The single stage currently in effect. It determines which workspace is shown
+	 * and which stage is marked in the workflow roadmap. Never persisted: this is
+	 * editor state, not screen data.
+	 */
+	activeStage = $state<StageId>(DEFAULT_STAGE);
+	/** How the layout stage is presented. Survives stage changes. */
+	layoutPresentation = $state<LayoutPresentation>(DEFAULT_LAYOUT_PRESENTATION);
 	dirty = $state(false);
 
 	constructor(
 		private readonly components: ComponentRegistry,
 		private readonly apis: ApiRegistry
 	) {}
+
+	/** Moves to a stage. An unknown id is ignored rather than half-applied. */
+	selectStage(id: StageId): void {
+		const stage = toStageId(id);
+		if (stage === undefined) return;
+		this.activeStage = stage;
+	}
+
+	/** Switches the layout stage's presentation. Never alters the active stage. */
+	setLayoutPresentation(value: LayoutPresentation): void {
+		this.layoutPresentation = value;
+	}
 
 	get selectedComponent(): UIComponentInstance | undefined {
 		return findComponentById(this.definition, this.selectedComponentId);

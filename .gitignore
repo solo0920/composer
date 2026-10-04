@@ -13,3 +13,14 @@ blob-report
 playwright/.cache
 # Playwright Chromium shared libs, installed by scripts/setup-e2e.sh
 .playwright-libs
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.log
+
+# .vscode/extensions.json is tracked deliberately, so only the rest is ignored
+.vscode/*
+!.vscode/extensions.json

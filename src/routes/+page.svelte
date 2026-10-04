@@ -33,7 +33,8 @@
 	$effect(() => {
 		const definition = workspace.composer.definition;
 		const context = workspace.context;
-		if (workspace.composer.mode !== 'preview') return;
+		// Bound data is only needed while the preview stage is on screen.
+		if (workspace.composer.activeStage !== 'preview') return;
 		void previewRuntime.load(definition, context);
 	});
 

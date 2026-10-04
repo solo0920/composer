@@ -3,34 +3,52 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs/index.js';
-	import type { ComposerMode, ComposerView } from './state/composer-state.svelte';
+	import type { LayoutPresentation, StageId } from './stages';
 	import FileMenu from '../apps/FileMenu.svelte';
 
 	let {
 		appName,
-		mode,
-		view,
+		activeStage,
+		layoutPresentation,
 		dirty,
 		hasApp,
 		message,
-		onmodechange,
-		onviewchange,
+		onstagechange,
+		onpresentationchange,
 		onreset,
-		onfilecommand,
-		workspaceView = $bindable<'compose' | 'binding'>('compose')
+		onfilecommand
 	}: {
 		appName: string;
-		mode: ComposerMode;
-		view: ComposerView;
+		activeStage: StageId;
+		layoutPresentation: LayoutPresentation;
 		dirty: boolean;
 		hasApp: boolean;
 		message: string | null;
-		onmodechange: (mode: ComposerMode) => void;
-		onviewchange: (view: ComposerView) => void;
+		onstagechange: (stage: StageId) => void;
+		onpresentationchange: (value: LayoutPresentation) => void;
 		onreset: () => void;
 		onfilecommand: (command: 'new' | 'open' | 'save' | 'saveAs' | 'export' | 'settings') => void;
-		workspaceView?: 'compose' | 'binding';
 	} = $props();
+
+	const SUCCESS_PREFIXES = [
+		'Saved',
+		'Created',
+		'Opened',
+		'Reopened',
+		'Exported',
+		'Settings',
+		'Reset'
+	];
+
+	const messageTone = $derived(
+		message !== null && SUCCESS_PREFIXES.some((prefix) => message.startsWith(prefix))
+			? 'text-muted-foreground'
+			: 'text-destructive'
+	);
+
+	// True while the layout stage owns the presentation control, so it is never
+	// offered on a stage where it would have no effect.
+	const showsLayoutPresentation = $derived(activeStage === 'layout');
 </script>
 
 <header class="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
@@ -48,66 +66,54 @@
 		{/if}
 	</div>
 
-	<div class="flex items-center gap-1">
-		<Button size="sm" variant={mode === 'edit' ? 'default' : 'outline'} onclick={() => onmodechange('edit')}>
-			Edit
-		</Button>
+	<!-- TEMPORARY SHIM (removed in User Story 2 and User Story 4). These controls
+	     predate the workflow roadmap and delegate to the same stage axis, so the
+	     application stays fully usable while the roadmap is built. -->
+	<div class="flex items-center gap-1" data-testid="legacy-mode-toggle">
 		<Button
 			size="sm"
-			variant={mode === 'preview' ? 'default' : 'outline'}
+			variant={activeStage === 'preview' ? 'default' : 'outline'}
 			data-testid="preview-toggle"
-			onclick={() => onmodechange('preview')}
+			onclick={() => onstagechange('preview')}
 		>
 			Preview
 		</Button>
 	</div>
 
-	{#if mode === 'edit'}
-		<Tabs value={view} onValueChange={(next) => onviewchange(next as ComposerView)}>
+	<div class="flex items-center gap-1" data-testid="workspace-view">
+		<Button
+			size="sm"
+			variant={activeStage === 'binding' ? 'secondary' : 'ghost'}
+			data-testid="view-binding"
+			onclick={() => onstagechange('binding')}
+		>
+			Binding
+		</Button>
+		<Button
+			size="sm"
+			variant={activeStage === 'layout' ? 'secondary' : 'ghost'}
+			data-testid="view-compose"
+			onclick={() => onstagechange('layout')}
+		>
+			Compose
+		</Button>
+	</div>
+
+	{#if showsLayoutPresentation}
+		<Tabs
+			value={layoutPresentation}
+			onValueChange={(next) => onpresentationchange(next as LayoutPresentation)}
+		>
 			<TabsList>
 				<TabsTrigger value="visual">Visual</TabsTrigger>
 				<TabsTrigger value="json">JSON</TabsTrigger>
 			</TabsList>
 		</Tabs>
-
-		<div class="flex items-center gap-1" data-testid="workspace-view">
-			<Button
-				size="sm"
-				variant={workspaceView === 'compose' ? 'secondary' : 'ghost'}
-				data-testid="view-compose"
-				onclick={() => {
-					workspaceView = 'compose';
-				}}
-			>
-				Compose
-			</Button>
-			<Button
-				size="sm"
-				variant={workspaceView === 'binding' ? 'secondary' : 'ghost'}
-				data-testid="view-binding"
-				onclick={() => {
-					workspaceView = 'binding';
-				}}
-			>
-				Binding
-			</Button>
-		</div>
 	{/if}
 
 	<div class="ml-auto flex items-center gap-2">
 		{#if message}
-			<span
-				class="max-w-md truncate text-xs {message.startsWith('Saved')
-					|| message.startsWith('Created')
-					|| message.startsWith('Opened')
-					|| message.startsWith('Reopened')
-					|| message.startsWith('Exported')
-					|| message.startsWith('Settings')
-					|| message.startsWith('Reset')
-					? 'text-muted-foreground'
-					: 'text-destructive'}"
-				data-testid="toolbar-message">{message}</span
-			>
+			<span class="max-w-md truncate text-xs {messageTone}" data-testid="toolbar-message">{message}</span>
 		{/if}
 		<Button size="sm" variant="ghost" onclick={onreset} disabled={!hasApp}>Reset</Button>
 		<Button size="sm" onclick={() => onfilecommand('save')} disabled={!hasApp} data-testid="save">Save</Button>

@@ -16,6 +16,8 @@ import type { StackRegistry } from '$lib/registry/stack-registry';
 import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 	import SettingsDialog from '../apps/SettingsDialog.svelte';
 	import Toolbar from './Toolbar.svelte';
+	import WorkflowRoadmap from './workflow/WorkflowRoadmap.svelte';
+	import { STAGES } from './stages';
 
 	/**
 	 * Composer shell. Holds no definition state of its own: everything renders
@@ -46,8 +48,6 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 	const selectedDef = $derived(composer.selectedComponentDefinition);
 	const insertTarget = $derived(composer.insertParentId);
 	const hasApp = $derived(workspace.app !== null);
-
-	let workspaceView = $state<'compose' | 'binding'>('compose');
 
 	// One flag per dialog so each can be bound directly.
 	let openNew = $state(false);
@@ -80,21 +80,31 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+	<!-- The roadmap is presentational: it reports the active stage and asks to change
+	     it. All stage-to-content mapping stays in the branch below, so the highlight
+	     cannot drift away from what is shown. -->
+	<WorkflowRoadmap
+		stages={STAGES}
+		activeStage={composer.activeStage}
+		onselect={(stage) => composer.selectStage(stage)}
+	/>
+
 	<Toolbar
 		appName={definition.name}
-		mode={composer.mode}
-		view={composer.view}
+		activeStage={composer.activeStage}
+		layoutPresentation={composer.layoutPresentation}
 		dirty={composer.dirty}
 		{hasApp}
 		message={workspace.message}
-		onmodechange={(mode) => (composer.mode = mode)}
-		onviewchange={(view) => (composer.view = view)}
+		onstagechange={(stage) => composer.selectStage(stage)}
+		onpresentationchange={(value) => composer.setLayoutPresentation(value)}
 		onreset={() => workspace.resetToDemo()}
 		onfilecommand={run}
-		bind:workspaceView
 	/>
 
-	{#if composer.mode === 'preview' && hasApp}
+	<!-- The single stage-to-content mapping. Nothing else in the app decides what the
+	     workspace shows, so the active stage can never disagree with the content. -->
+	{#if composer.activeStage === 'preview' && hasApp}
 		<main class="flex-1 overflow-y-auto p-6">
 			<div class="mx-auto max-w-5xl">
 				<h1 class="mb-4 text-xl font-bold" data-testid="preview-title">{definition.name}</h1>
@@ -106,7 +116,7 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 				/>
 			</div>
 		</main>
-	{:else if workspaceView === 'binding'}
+	{:else if composer.activeStage === 'binding'}
 		<BindingPanel
 			flows={workspace.flows}
 			registry={stackRegistry}
@@ -120,7 +130,7 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 				onadd={(type) => composer.addComponent(type)}
 			/>
 
-			{#if composer.view === 'visual'}
+			{#if composer.layoutPresentation === 'visual'}
 				<Canvas
 					{definition}
 					selectedId={composer.selectedComponentId}
