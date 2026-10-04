@@ -118,3 +118,54 @@ describe('the registries are the single source of truth', () => {
 		expect(button?.defaultProps['label']).toBe('Button');
 	});
 });
+/**
+ * Guards the workflow consolidation (spec 003). The stage roadmap replaced three
+ * overlapping toggle groups; the failure mode this prevents is one of them being
+ * added back "just for one more mode", which is how the duplication started.
+ */
+describe('the composer has exactly one navigation control group', () => {
+	/**
+	 * Test ids of the controls the roadmap replaced. Matched as whole identifiers so
+	 * a passing mention in a comment cannot satisfy or trip the guard by accident.
+	 */
+	const REMOVED_CONTROL_IDS = [
+		'preview-toggle',
+		'view-binding',
+		'view-compose',
+		'workspace-view',
+		'legacy-mode-toggle'
+	] as const;
+
+	it('has no removed navigation control identifier left in composer sources', () => {
+		for (const id of REMOVED_CONTROL_IDS) {
+			const pattern = new RegExp(`data-testid\\s*=\\s*["']${id}["']`);
+			for (const file of sources) {
+				expect(
+					pattern.test(file.source),
+					`${file.path} must not re-add the '${id}' control; the workflow stages replace it`
+				).toBe(false);
+			}
+		}
+	});
+
+	it('offers the stages as the only navigation control', () => {
+		// The stages are the single control group, so exactly one component renders
+		// them and it is the header's.
+		const renderers = sources.filter((file) =>
+			/<WorkflowRoadmap[\s>]/.test(file.source)
+		);
+		expect(
+			renderers.map((file) => file.path.split('/').pop()),
+			'only the header may render the workflow roadmap'
+		).toEqual(['Toolbar.svelte']);
+	});
+
+	it('keeps the presentation control inside the layout stage, not the header', () => {
+		// FR-010. The control is meaningless on the other two stages, so the header
+		// must not carry it.
+		const toolbar = sources.find((file) => file.path.endsWith('Toolbar.svelte'));
+		expect(toolbar).toBeDefined();
+		expect(toolbar?.source).not.toContain('TabsTrigger');
+		expect(toolbar?.source).not.toContain('LayoutPresentation');
+	});
+});

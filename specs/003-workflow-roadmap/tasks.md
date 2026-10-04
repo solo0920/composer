@@ -94,16 +94,16 @@ unsaved indicator stays accurate.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T016 [P] [US2] Add integration tests to `src/lib/composer/Composer.svelte.test.ts` covering: selecting each stage changes the rendered content in the same transition; selecting the already-active stage changes nothing; unsaved edits survive a stage change and the dirty flag stays accurate
+- [X] T016 [P] [US2] Add integration tests to `src/lib/composer/Composer.svelte.test.ts` covering: selecting each stage changes the rendered content in the same transition; selecting the already-active stage changes nothing; unsaved edits survive a stage change and the dirty flag stays accurate — covered by the binding/preview content tests, the reselect test, the dirty-flag test and the full round-trip agreement test
 - [X] T017 [P] [US2] Migrate the end-to-end tests in `e2e/composer.spec.ts` that reference removed controls: 7 references to `preview-toggle` and 4 references to `view-binding` become roadmap stage selections via a shared `goToStage` helper. Preserve each test's original assertion; only the navigation path changes — completed early by the header merge, see plan D2
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Wire stage selection in `src/lib/composer/workflow/WorkflowRoadmap.svelte` to call an `onselect` callback, and wire that callback to `selectStage` in `src/lib/composer/Composer.svelte`
+- [X] T018 [US2] Wire stage selection in `src/lib/composer/workflow/WorkflowRoadmap.svelte` to call an `onselect` callback, and wire that callback to `selectStage` in `src/lib/composer/Composer.svelte` — completed in the Foundational phase: `onclick` calls `onselect`, and `onstagechange` calls `selectStage`
 - [X] T019 [US2] Remove the `Compose`/`Binding` control group from `src/lib/composer/Toolbar.svelte`, since the `binding` and `layout` stages replace it (contract section 5) — completed early by the header merge, see plan D2
 - [X] T020 [US2] Remove the `Edit`/`Preview` control group from `src/lib/composer/Toolbar.svelte`, since the `layout` and `preview` stages replace it, and drop the now-unused `mode` prop — completed early by the header merge, see plan D2
-- [ ] T021 [US2] Add cases to `src/lib/composer/Composer.svelte.test.ts` proving no stage change leaves a loading or error state visible on the abandoned stage, per FR-011, and that browser back and forward leave the indicator agreeing with the content, per FR-016 and research R5 (stage is deliberately not written to browser history, as the application has no router)
-- [ ] T022 [US2] Run `npm run check`, `npm run test`, `npm run build` and `npm run test:e2e`, confirming no previously passing test was removed or relaxed
+- [X] T021 [US2] Add cases to `src/lib/composer/Composer.svelte.test.ts` proving no stage change leaves a loading or error state visible on the abandoned stage, per FR-011, and that browser back and forward leave the indicator agreeing with the content, per FR-016 and research R5 (stage is deliberately not written to browser history, as the application has no router) — covers the abandoned-stage and history cases; the stage is deliberately not written to history (research R5), asserted by the reload test
+- [X] T022 [US2] Run `npm run check`, `npm run test`, `npm run build` and `npm run test:e2e`, confirming no previously passing test was removed or relaxed — 315 unit/integration and 26 e2e passing at this checkpoint
 
 **Checkpoint**: User Stories 1 and 2 both work; exactly one navigation control group
 remains.
@@ -120,12 +120,12 @@ confirm each arrival is announced and the active state is perceivable.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T023 [P] [US3] Add cases to `src/lib/composer/workflow/WorkflowRoadmap.svelte.test.ts` asserting each stage is focusable and activatable by keyboard, and that the active stage exposes the non-colour active signal required by FR-008
+- [X] T023 [P] [US3] Add cases to `src/lib/composer/workflow/WorkflowRoadmap.svelte.test.ts` asserting each stage is focusable and activatable by keyboard, and that the active stage exposes the non-colour active signal required by FR-008 — unit tests assert the structural keyboard guarantee; real activation is asserted in e2e because jsdom cannot implement it. Both proven to fail by injection
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] Ensure each stage in `src/lib/composer/workflow/WorkflowRoadmap.svelte` is a natively focusable, activatable control in normal tab order, with no custom arrow-key handling, per research R4
-- [ ] T025 [US3] Group the stages under an accessible group label in `src/lib/composer/workflow/WorkflowRoadmap.svelte` so the indicator is announced as one control group
+- [X] T024 [US3] Ensure each stage in `src/lib/composer/workflow/WorkflowRoadmap.svelte` is a natively focusable, activatable control in normal tab order, with no custom arrow-key handling, per research R4 — already satisfied: each stage is a native `<button type="button">` with no tabindex, so no code change was needed
+- [X] T025 [US3] Group the stages under an accessible group label in `src/lib/composer/workflow/WorkflowRoadmap.svelte` so the indicator is announced as one control group — already satisfied: the stages sit in a `<ol role="group" aria-label="Authoring workflow">`
 
 **Checkpoint**: User Story 3 is functional and independently testable.
 
@@ -142,14 +142,14 @@ absent from the other two stages.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T026 [P] [US4] Add integration tests to `src/lib/composer/Composer.svelte.test.ts` proving `layoutPresentation` is unchanged by every stage change (data-model constraint, verbatim: "MUST survive leaving and re-entering the layout stage"), and that the presentation control is absent on the `binding` and `preview` stages per FR-010
-- [ ] T027 [P] [US4] Migrate the 2 end-to-end tests in `e2e/composer.spec.ts` that use `getByRole('tab')` for the Visual/JSON switch to the new layout presentation control, preserving their assertions
+- [X] T026 [P] [US4] Add integration tests to `src/lib/composer/Composer.svelte.test.ts` proving `layoutPresentation` is unchanged by every stage change (data-model constraint, verbatim: "MUST survive leaving and re-entering the layout stage"), and that the presentation control is absent on the `binding` and `preview` stages per FR-010 — extended with a header-scope assertion, the Visual default, and a round trip through every stage
+- [X] T027 [P] [US4] Migrate the 2 end-to-end tests in `e2e/composer.spec.ts` that use `getByRole('tab')` for the Visual/JSON switch to the new layout presentation control, preserving their assertions — the two tab-based tests still resolve after the move; they were strengthened to assert the control is scoped to the layout stage
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Add the layout presentation control inside the layout stage in `src/lib/composer/Composer.svelte`, bound to `setLayoutPresentation`
-- [ ] T029 [US4] Remove the `Visual`/`JSON` tab group from `src/lib/composer/Toolbar.svelte` and its now-unused `view` prop, since the control now lives inside the layout stage (contract section 5)
-- [ ] T030 [US4] Run `npm run check`, `npm run test`, `npm run build` and `npm run test:e2e`, confirming no previously passing test was removed or relaxed
+- [X] T028 [US4] Add the layout presentation control inside the layout stage in `src/lib/composer/Composer.svelte`, bound to `setLayoutPresentation` — `layout-presentation-bar` inside the layout branch, bound to `setLayoutPresentation`
+- [X] T029 [US4] Remove the `Visual`/`JSON` tab group from `src/lib/composer/Toolbar.svelte` and its now-unused `view` prop, since the control now lives inside the layout stage (contract section 5) — `view` had already been dropped by the header merge; the Tabs import and both props went in this milestone
+- [X] T030 [US4] Run `npm run check`, `npm run test`, `npm run build` and `npm run test:e2e`, confirming no previously passing test was removed or relaxed — 315 unit/integration and 26 e2e passing, no test removed or relaxed
 
 **Checkpoint**: User Stories 1 to 4 all work independently; delivered layout
 capability is preserved.
@@ -166,14 +166,14 @@ confirm a stage is still marked and each state is explained in place.
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T031 [P] [US5] Add integration tests to `src/lib/composer/Composer.svelte.test.ts` proving the default stage after load is `layout` and that indicator and content agree on first paint (data-model constraint, verbatim: "Default on load and after a reload: `layout`")
-- [ ] T032 [US5] Add cases to `src/lib/composer/Composer.svelte.test.ts` covering the no-app-open state (FR-015) and the no-bindings preview state (FR-014), asserting both explain themselves and leave a valid stage marked
+- [X] T031 [P] [US5] Add integration tests to `src/lib/composer/Composer.svelte.test.ts` proving the default stage after load is `layout` and that indicator and content agree on first paint (data-model constraint, verbatim: "Default on load and after a reload: `layout`") — asserted on first paint, before any interaction
+- [X] T032 [US5] Add cases to `src/lib/composer/Composer.svelte.test.ts` covering the no-app-open state (FR-015) and the no-bindings preview state (FR-014), asserting both explain themselves and leave a valid stage marked — three of these failed against the old code and found the preview fall-through
 
 ### Implementation for User Story 5
 
-- [ ] T033 [US5] Handle the no-app-open case in `src/lib/composer/Composer.svelte` so the roadmap still marks a valid stage and the workspace explains that no app is open, per FR-015
-- [ ] T034 [US5] Handle the no-bindings case in the preview branch of `src/lib/composer/Composer.svelte` so it explains that nothing is bound instead of rendering blank, per FR-014
-- [ ] T035 [US5] Verify in `e2e/composer.spec.ts` that the default stage after reload agrees with the content shown, per quickstart Scenario 5
+- [X] T033 [US5] Handle the no-app-open case in `src/lib/composer/Composer.svelte` so the roadmap still marks a valid stage and the workspace explains that no app is open, per FR-015 — `no-app-state` renders its own explanation instead of another stage content
+- [X] T034 [US5] Handle the no-bindings case in the preview branch of `src/lib/composer/Composer.svelte` so it explains that nothing is bound instead of rendering blank, per FR-014 — `no-bindings-state` is additive: the rendered view stays, per the contract
+- [X] T035 [US5] Verify in `e2e/composer.spec.ts` that the default stage after reload agrees with the content shown, per quickstart Scenario 5 — asserted after an explicit `page.reload()`
 
 **Checkpoint**: All five user stories are independently functional.
 
@@ -183,12 +183,12 @@ confirm a stage is still marked and each state is explained in place.
 
 **Purpose**: Guard the consolidation and verify the whole feature.
 
-- [ ] T036 Add the single-navigation-control-group guard to `src/lib/registry/extensibility.test.ts` per research R7, asserting the removed control identifiers no longer appear in composer sources
-- [ ] T037 Prove the new guard fails by temporarily reintroducing a removed control identifier in `src/lib/composer/Toolbar.svelte`, confirming the guard fails, then reverting. Constitution rule 10 requires this injection before the guard is accepted
-- [ ] T038 [P] Update `README.md` to describe the stage roadmap as the way to navigate the composer, and remove any statement that navigation is controlled by the replaced toggle groups
-- [ ] T039 [P] Verify `specs/003-workflow-roadmap/quickstart.md` Scenarios 1 to 8 against the running application and record the outcome in `specs/003-workflow-roadmap/baseline.md`
-- [ ] T040 Run the full definition of done: `npm run check` reports zero errors and zero warnings, `npm run test` passes with no previously passing test removed or relaxed, `npm run build` succeeds, and `npm run test:e2e` passes with the main flow exercised in a real browser
-- [ ] T041 Confirm FR-018 in `e2e/composer.spec.ts` by verifying that a screen definition saved before this feature loads and previews unchanged, with no change to the format written by `src/lib/persistence/app-library.ts`
+- [X] T036 Add the single-navigation-control-group guard to `src/lib/registry/extensibility.test.ts` per research R7, asserting the removed control identifiers no longer appear in composer sources — three guards: removed control ids, a second stage renderer, and the presentation control in the header
+- [X] T037 Prove the new guard fails by temporarily reintroducing a removed control identifier in `src/lib/composer/Toolbar.svelte`, confirming the guard fails, then reverting. Constitution rule 10 requires this injection before the guard is accepted — all three proven to fail by injecting each violation, then reverted
+- [X] T038 [P] Update `README.md` to describe the stage roadmap as the way to navigate the composer, and remove any statement that navigation is controlled by the replaced toggle groups — navigation described as one top bar; the stale `mode`/`view` state names and the false toggle references are gone
+- [X] T039 [P] Verify `specs/003-workflow-roadmap/quickstart.md` Scenarios 1 to 8 against the running application and record the outcome in `specs/003-workflow-roadmap/baseline.md` — all nine scenarios recorded with evidence, including the defects found, in `baseline.md`
+- [X] T040 Run the full definition of done: `npm run check` reports zero errors and zero warnings, `npm run test` passes with no previously passing test removed or relaxed, `npm run build` succeeds, and `npm run test:e2e` passes with the main flow exercised in a real browser — 0 errors/0 warnings, 323 tests, build succeeds, 30 e2e over three consecutive clean runs
+- [X] T041 Confirm FR-018 in `e2e/composer.spec.ts` by verifying that a screen definition saved before this feature loads and previews unchanged, with no change to the format written by `src/lib/persistence/app-library.ts` — `src/lib/persistence` and `src/lib/domain` are byte-identical to `b349491`, and a hand-written legacy document loads, previews and keeps its flows; proven to fail when the persisted field name was changed
 
 ---
 

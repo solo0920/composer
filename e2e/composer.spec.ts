@@ -60,6 +60,97 @@ test('the structured view survives leaving and re-entering the layout stage', as
 	await expect(page.getByTestId('canvas-grid')).toHaveCount(0);
 });
 
+/**
+ * FR-018: the saved definition format must not change. The document below is a
+ * literal fixture written by hand in the pre-feature format, not something the
+ * app produced during this run, so loading it proves the format still parses.
+ */
+const LEGACY_APP = {
+	id: 'legacy-app',
+	name: 'Legacy Format App',
+	createdAt: '2026-01-15T10:00:00.000Z',
+	updatedAt: '2026-01-15T10:00:00.000Z',
+	context: { customerId: 'CUST-1001' },
+	definition: {
+		id: 'legacy-app',
+		version: 1,
+		name: 'Legacy Format App',
+		layout: { type: 'grid', columns: 12 },
+		components: [
+			{
+				id: 'title',
+				type: 'text',
+				props: { text: 'Legacy heading', variant: 'heading' },
+				layout: { column: 1, span: 12 }
+			},
+			{
+				id: 'card',
+				type: 'data-card',
+				props: { title: 'Profile' },
+				layout: { column: 1, span: 6 },
+				binding: {
+					api: 'customer.getProfile',
+					input: { customerId: '$context.customerId' },
+					output: { title: '$.name', subtitle: '$.email' }
+				}
+			}
+		]
+	},
+	flows: [
+		{
+			id: 'profile',
+			label: 'View profile',
+			nodes: [
+				{ id: 'load', label: 'Load data', role: 'data', stack: 'http-fetch' },
+				{ id: 'show', label: 'Show card', role: 'render', stack: 'svelte' }
+			]
+		}
+	]
+};
+
+test('a definition saved before this feature loads and previews unchanged', async ({ page }) => {
+	// Seed the store with the literal legacy document, bypassing the app entirely.
+	await page.goto('/');
+	await page.evaluate((app) => {
+		window.localStorage.setItem('uidc.apps.index.v1', JSON.stringify({
+			activeId: (app as { id: string }).id,
+			apps: [
+				{
+					id: (app as { id: string }).id,
+					name: (app as { name: string }).name,
+					updatedAt: (app as { updatedAt: string }).updatedAt,
+					componentCount: 2
+				}
+			]
+		}));
+		window.localStorage.setItem(
+			`uidc.app.v1.${(app as { id: string }).id}`,
+			JSON.stringify(app)
+		);
+	}, LEGACY_APP);
+
+	await page.reload();
+	await expect(page.getByTestId('composer-header')).toBeVisible();
+
+	// It opened, and the definition is intact.
+	await expect(page.getByTestId('app-name')).toHaveText('Legacy Format App');
+	await expect(page.locator('[data-testid="canvas-item"]')).toHaveCount(2);
+	await expect(page.locator('[data-testid="text-component"]').first()).toHaveText(
+		'Legacy heading'
+	);
+
+	// The binding survives and still resolves live data in Preview. The legacy
+	// document's context names CUST-1001, so the payload must be that customer's.
+	await goToStage(page, 'preview');
+	await expect(page.getByTestId('runtime-root')).toContainText('Ada Lovelace');
+	await expect(page.getByTestId('runtime-root')).toContainText('ada@example.com');
+
+	// The flows survived too, so the binding stage is not silently empty.
+	await goToStage(page, 'binding');
+	await expect(page.locator('[data-testid="flow"]')).toHaveCount(1);
+	await expect(page.locator('[data-testid="flow-node"]')).toHaveCount(2);
+});
+
 test('the default stage after reload agrees with the content shown', async ({ page }) => {
 	// Quickstart Scenario 5 / data-model: "Default on load and after a reload:
 	// `layout`". The indicator and the content must agree both times.

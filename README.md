@@ -122,7 +122,8 @@ src/routes/
 | Composer is registry-driven | `ComponentPalette`, `BindingEditor`, `BindingPanel` read only registries |
 | Composer branches on no type literal | `registry/extensibility.test.ts` fails the build if it does |
 | No second copy of the definition | Composer and Preview both render `workspace.composer.definition` |
-| UI state is not domain data | `selectedComponentId`, `mode`, `view`, `dirty` live in `ComposerState` |
+| UI state is not domain data | `selectedComponentId`, `activeStage`, `layoutPresentation`, `dirty` live in `ComposerState` |
+| Navigation is not duplicated | `registry/extensibility.test.ts` fails if a replaced toggle id or a second stage renderer reappears |
 | External data is validated | `validateUIDefinition` / `validateFlows` / `parseAppDocument` gate storage, JSON and export |
 | Untrusted trees cannot overflow | `walkComponents` is iterative; nesting is capped at 12 |
 | Failures are readable text | `Result<T>`, `ApiCallError`, `Unknown component: X` |
@@ -160,8 +161,10 @@ Unit        259   domain, three registries, flows, app library, workspace,
 Two tests are deliberately adversarial rather than confirming:
 
 - `registry/extensibility.test.ts` greps Composer sources for component-type
-  literals and fails if one appears. Verified to fail when a violation is
-  injected.
+  literals and fails if one appears. It also fails if a replaced navigation
+  control id reappears, if a second component renders the workflow stages, or
+  if the presentation control moves back into the header. Each of those guards
+  was verified to fail when a violation is injected.
 - The API integration test boots a real Node HTTP server serving the same
   handlers as the SvelteKit routes, so `fetch`, status codes and JSON parsing
   are genuinely exercised.
@@ -190,6 +193,12 @@ Deliberate, not oversights:
 - Every grid level uses the same column count; no responsive breakpoints.
 - The Button component has no event handling, and there is no undo/redo.
 - Export writes JSON only. Importing an exported file is not wired up yet.
+- Every page load logs one `404` for `/favicon.ico`; `static/` ships only
+  `robots.txt`. Cosmetic, found while investigating an e2e flake, and left
+  alone here because it belongs to no milestone in this feature.
+- The stage is not written to browser history. The app has no router, so back
+  and forward are no-ops for navigation; a stage deliberately reached by the
+  user stays put.
 
 ## Future Work
 

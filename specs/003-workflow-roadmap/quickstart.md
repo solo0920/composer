@@ -179,10 +179,12 @@ npm run build      # production build succeeds
 npm run test:e2e   # all end-to-end tests pass in a real browser
 ```
 
-**Migration note**: 10 end-to-end tests currently reference controls this feature
-replaces — 7 use `preview-toggle`, 4 use `view-binding`, 2 use the Visual/JSON tabs.
-They are updated **within this milestone**, not afterwards. If the suite is red after
-the change, that milestone is not done.
+**Migration note**: 11 end-to-end references to controls this feature replaces —
+7 use `preview-toggle` and 4 use `view-binding`. Two further tests select the
+Visual/JSON tabs by role, so they kept working when the control moved inside the
+layout stage and were strengthened instead of rewritten. All are updated **within
+this milestone**, not afterwards. If the suite is red after the change, that milestone
+is not done.
 
 ---
 
