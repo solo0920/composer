@@ -75,6 +75,90 @@ describe('WorkflowRoadmap', () => {
 		expect(group?.getAttribute('aria-label')).toBe('Authoring workflow');
 	});
 
+	/**
+	 * jsdom does not implement the browser's Enter/Space activation behaviour for
+	 * buttons, so "operable by keyboard" cannot be proven here by dispatching key
+	 * events: such a test would pass regardless of the markup. The structural
+	 * guarantee that makes a control keyboard operable is asserted below, and the
+	 * real traversal and activation are exercised in `e2e/composer.spec.ts`.
+	 *
+	 * The one thing jsdom *can* falsify is focus, so each stage is asserted to take
+	 * focus, and the absence of the usual focus-order sabotage (`tabindex`) is
+	 * asserted directly rather than inferred.
+	 */
+	describe('keyboard operation (FR-008, research R4)', () => {
+		const interactive = () =>
+			render(WorkflowRoadmap, {
+				props: { stages: STAGES, activeStage: 'layout', onselect: () => {} }
+			});
+
+		it('renders each stage as a native button, which is what makes it keyboard operable', () => {
+			const { container } = interactive();
+			const controls = container.querySelectorAll('[data-testid="workflow-stage"]');
+			expect(controls).toHaveLength(3);
+
+			for (const control of controls) {
+				expect(control.tagName).toBe('BUTTON');
+				// `type="button"` keeps Enter from submitting anything the control is
+				// nested in.
+				expect(control.getAttribute('type')).toBe('button');
+			}
+		});
+
+		it('leaves every stage in the normal tab order', () => {
+			// A custom tabindex is the usual way to drop a control out of the tab
+			// order, so none may appear on any stage.
+			const { container } = interactive();
+			for (const control of container.querySelectorAll('[data-testid="workflow-stage"]')) {
+				expect(control.hasAttribute('tabindex')).toBe(false);
+				expect(control.hasAttribute('disabled')).toBe(false);
+			}
+		});
+
+		it('lets each stage take focus', () => {
+			const { container } = interactive();
+			for (const control of container.querySelectorAll('[data-testid="workflow-stage"]')) {
+				(control as HTMLElement).focus();
+				expect(document.activeElement).toBe(control);
+			}
+		});
+
+		it('offers no selectable control when the roadmap is only a status display', () => {
+			// Without a handler the stages describe the position in the workflow
+			// rather than offering controls that would do nothing.
+			const { container } = roadmap();
+			for (const control of container.querySelectorAll('[data-testid="workflow-stage"]')) {
+				expect(control.tagName).not.toBe('BUTTON');
+				expect(control.hasAttribute('tabindex')).toBe(false);
+			}
+		});
+
+		it('signals the active stage by weight as well as by colour', () => {
+			// FR-008 requires the active state to be perceivable without colour
+			// vision. `aria-current` covers assistive technology; the weight change
+			// covers a sighted reader who cannot distinguish the fill colours.
+			const { container } = interactive();
+			const active = container.querySelector('[data-stage-id="layout"]')!;
+			const inactive = container.querySelector('[data-stage-id="binding"]')!;
+
+			expect(active.className).toContain('font-medium');
+			expect(inactive.className).not.toContain('font-medium');
+			expect(active.getAttribute('aria-current')).toBe('step');
+		});
+
+		it('reaches the stages with accessible names that include the step number', () => {
+			const { container } = interactive();
+			for (const control of container.querySelectorAll('[data-testid="workflow-stage"]')) {
+				// The numeral is part of the control's text, so the accessible name
+				// carries the position as well as the label.
+				expect(control.textContent?.replace(/\s+/g, ' ').trim()).toMatch(
+					/^[123] (Binding|UI Layout|Preview)$/
+				);
+			}
+		});
+	});
+});
+
 	it('renders in stage order even when the array arrives unordered', () => {
 		// Contract section 4 requires every stage rendered "in `order`", so the
 		// sequence comes from the data, not from the array it arrived in.
@@ -88,4 +172,3 @@ describe('WorkflowRoadmap', () => {
 			)
 		).toEqual(['binding', 'layout', 'preview']);
 	});
-});

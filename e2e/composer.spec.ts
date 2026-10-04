@@ -30,6 +30,49 @@ test.beforeEach(async ({ page }) => {
 	await expect(page.getByTestId('workflow-roadmap')).toBeVisible();
 });
 
+test('every stage is reachable and operable by keyboard alone', async ({ page }) => {
+	const stage = (id: 'binding' | 'layout' | 'preview') =>
+		page.locator(`[data-testid="workflow-stage"][data-stage-id="${id}"]`);
+	const focusedStage = async () => {
+		const focused = await page.evaluate(() =>
+			document.activeElement?.getAttribute('data-stage-id')
+		);
+		return focused;
+	};
+
+	// Start just before the roadmap so the traversal order is observable from a
+	// known point rather than from wherever the browser happens to begin.
+	await page.getByTestId('file-menu').focus();
+	await expect(page.getByTestId('file-menu')).toBeFocused();
+
+	// All three stages are in the normal tab order, in workflow order, with no
+	// custom arrow-key handling needed (research R4).
+	await page.keyboard.press('Tab');
+	expect(await focusedStage()).toBe('binding');
+	await page.keyboard.press('Tab');
+	expect(await focusedStage()).toBe('layout');
+	await page.keyboard.press('Tab');
+	expect(await focusedStage()).toBe('preview');
+	await page.keyboard.press('Shift+Tab');
+	expect(await focusedStage()).toBe('layout');
+
+	// Enter activates the focused stage.
+	await page.keyboard.press('Enter');
+	await expect(stage('layout')).toHaveAttribute('aria-current', 'step');
+	await expect(page.getByTestId('canvas-grid')).toBeVisible();
+
+	// Space activates it too, and reaches the stage after the default one.
+	await page.keyboard.press('Shift+Tab');
+	expect(await focusedStage()).toBe('binding');
+	await page.keyboard.press('Space');
+	await expect(stage('binding')).toHaveAttribute('aria-current', 'step');
+	await expect(page.getByTestId('binding-panel')).toBeVisible();
+
+	// The active state is marked in a way that does not depend on colour.
+	await expect(stage('binding')).toHaveAttribute('aria-current', 'step');
+	await expect(stage('layout')).not.toHaveAttribute('aria-current', 'step');
+});
+
 test('opens on the UI Layout stage', async ({ page }) => {
 	// Data-model constraint: "Default on load and after a reload: `layout`".
 	await expect(page.locator('[data-testid="workflow-stage"][data-stage-id="layout"]')).toHaveAttribute(
