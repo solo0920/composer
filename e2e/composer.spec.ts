@@ -171,9 +171,15 @@ test('refuses to create an app without a name', async ({ page }) => {
 	await page.getByTestId('file-menu').click();
 	await page.getByTestId('file-new').click();
 	await page.getByTestId('app-name-input').fill('   ');
-	// The confirm button is disabled by the form's required rule / no-op handler.
 	await page.getByTestId('app-name-confirm').click();
-	await expect(page.getByTestId('app-name')).toHaveText('Customer Risk Dashboard');
+
+	// The dialog stays open and the open app is untouched.
+	await expect(page.getByTestId('new-app-dialog')).toBeVisible();
+	await expect(page.getByTestId('toolbar-message')).toHaveCount(0);
+
+	await page.getByTestId('app-name-input').fill('Named App');
+	await page.getByTestId('app-name-confirm').click();
+	await expect(page.getByTestId('app-name')).toHaveText('Named App');
 });
 
 test('opens and switches between saved apps', async ({ page }) => {
@@ -316,6 +322,68 @@ test('renders an empty app without crashing', async ({ page }) => {
 	await page.getByTestId('preview-toggle').click();
 	await expect(page.getByTestId('preview-title')).toHaveText('Blank');
 	await expect(page.getByTestId('runtime-root')).toHaveCount(1);
+});
+
+test('lists e2e flows and their technology stacks', async ({ page }) => {
+	await page.getByTestId('view-binding').click();
+
+	await expect(page.getByTestId('binding-panel')).toBeVisible();
+	// Both demo flows, with every node listed.
+	await expect(page.getByTestId('flow')).toHaveCount(2);
+	await expect(page.getByTestId('flow-node')).toHaveCount(7);
+
+	// Roles come from the node definition, and each node has a stack dropdown.
+	await expect(page.locator('[data-testid="flow-node"][data-role="render"]').first()).toBeVisible();
+	await expect(page.getByTestId('node-stack-select')).toHaveCount(7);
+
+	// The shipped flow uses stacks that actually execute, so nothing blocks.
+	await expect(page.getByTestId('flow-blocking')).toHaveCount(0);
+	const nodeRow = (id: string) =>
+		page.locator(`[data-testid="flow-node"][data-node-id="${id}"]`);
+	await expect(nodeRow('render-preview')).toContainText('Svelte runtime');
+	await expect(nodeRow('fetch-risk')).toContainText('REST over HTTP');
+});
+
+test('changing a node stack warns when the stack is not implemented', async ({ page }) => {
+	await page.getByTestId('view-binding').click();
+
+	// The render node offers only renderer stacks, from the Stack Registry.
+	const nodeRow = (id: string) =>
+		page.locator(`[data-testid="flow-node"][data-node-id="${id}"]`);
+
+	await nodeRow('render-preview').getByTestId('node-stack-select').click();
+	await expect(page.getByTestId('node-stack-option')).toHaveCount(3);
+
+	await page.locator('[data-testid="node-stack-option"][data-stack-id="json-render"]').click();
+	await expect(nodeRow('render-preview')).toContainText(
+		'json-render is declared but not implemented in this MVP'
+	);
+	await expect(page.getByTestId('flow-blocking')).toContainText('not implemented in this MVP');
+	await expect(page.getByTestId('toolbar-message')).toContainText(
+		'Render the definition now uses json-render.'
+	);
+
+	// The choice is stored on the app and survives a reload.
+	await page.getByTestId('save').click();
+	await page.reload();
+	await page.getByTestId('view-binding').click();
+	await expect(nodeRow('render-preview')).toContainText('json-render');
+
+	// A data node cannot be given a renderer stack.
+	await nodeRow('fetch-risk').getByTestId('node-stack-select').click();
+	await expect(page.getByTestId('node-stack-option')).toHaveCount(2);
+	await expect(page.locator('[data-testid="node-stack-option"][data-stack-id="rest-http"]')).toBeVisible();
+});
+
+test('a node stack choice does not affect the rendered preview', async ({ page }) => {
+	await page.getByTestId('view-binding').click();
+	await page.locator('[data-testid="flow-node"][data-node-id="render-preview"]').getByTestId('node-stack-select').click();
+	await page.locator('[data-testid="node-stack-option"][data-stack-id="json-render"]').click();
+	await expect(page.getByTestId('flow-blocking')).toBeVisible();
+
+	// The MVP still renders with Svelte, so live data is still correct.
+	await page.getByTestId('preview-toggle').click();
+	await expect(page.getByTestId('runtime-root')).toContainText('Ada Lovelace');
 });
 
 test('collapses and expands palette categories', async ({ page }) => {

@@ -8,6 +8,9 @@ import {
 	validateUIDefinition,
 	type RegistryLookup
 } from '../domain/definitions/ui-definition.schema';
+import type { FlowDefinition } from '../domain/flows/flow-definition';
+import { validateFlows } from '../domain/flows/flow-definition.schema';
+import type { StackRegistry } from '../registry/stack-registry';
 import {
 	createApp as persistCreate,
 	deleteApp,
@@ -21,6 +24,7 @@ import {
 } from '../persistence/app-library';
 import {
 	blankAppWithDemo,
+	cloneJson,
 	copyAsNewApp,
 	createBlankApp,
 	downloadAppJson
@@ -52,7 +56,9 @@ export class Workspace {
 		private readonly components: ComponentRegistry,
 		private readonly apis: ApiRegistry,
 		private readonly registryLookup: RegistryLookup,
-		private readonly demoDefinition: AppDocument['definition']
+		private readonly stacks: StackRegistry,
+		private readonly demoDefinition: AppDocument['definition'],
+		private readonly demoFlows: FlowDefinition[]
 	) {
 		this.composer = new ComposerState(components, apis);
 	}
@@ -82,7 +88,10 @@ export class Workspace {
 			this.message = loaded.error;
 		}
 
-		const seeded = persistCreate(this.storage, blankAppWithDemo('Customer Risk Dashboard', this.demoDefinition));
+		const seeded = persistCreate(
+			this.storage,
+			blankAppWithDemo('Customer Risk Dashboard', this.demoDefinition, this.demoFlows)
+		);
 		if (seeded.ok) {
 			this.#adopt({ ...seeded.value, context: { customerId: 'CUST-1001' } });
 			this.refreshApps();
@@ -103,7 +112,10 @@ export class Workspace {
 			this.message = NAME_REQUIRED;
 			return;
 		}
-		const created = persistCreate(this.storage, createBlankApp(trimmed, this.context));
+		const created = persistCreate(
+			this.storage,
+			createBlankApp(trimmed, this.context, this.app?.flows ?? [])
+		);
 		if (!created.ok) {
 			this.message = created.error;
 			return;
@@ -230,9 +242,50 @@ export class Workspace {
 		this.message = 'Settings applied.';
 	}
 
-	resetToDemo(): void {
+	/** Flows of the open app. */
+	get flows(): FlowDefinition[] {
+		return this.app?.flows ?? [];
+	}
+
+	/**
+	 * Chooses the technology stack for one flow node. The pairing is validated
+	 * against the Stack Registry so a node can never hold a stack that cannot
+	 * serve its role.
+	 */
+	setNodeStack(flowId: string, nodeId: string, stackId: string): void {
 		if (!this.app) return;
-		this.composer.setDefinition(structuredClone(this.demoDefinition));
+		if (!this.stacks.has(stackId)) {
+			this.message = `Unknown technology stack: ${stackId}`;
+			return;
+		}
+
+		const flows = cloneJson(this.app.flows);
+		const flow = flows.find((candidate) => candidate.id === flowId);
+		const node = flow?.nodes.find((candidate) => candidate.id === nodeId);
+		if (!flow || !node) {
+			this.message = `Unknown node: ${nodeId}`;
+			return;
+		}
+
+		const previous = node.stack;
+		node.stack = stackId;
+
+		const validated = validateFlows(flows, this.stacks);
+		if (!validated.ok) {
+			node.stack = previous;
+			this.message = validated.error;
+			return;
+		}
+
+		this.app = { ...this.app, flows: validated.value };
+		this.composer.dirty = true;
+		this.message = `${node.label} now uses ${this.stacks.get(stackId)?.label ?? stackId}.`;
+	}
+
+	resetToDemo(): void {
+		if (this.app) this.app = { ...this.app, flows: cloneJson(this.demoFlows) };
+		if (!this.app) return;
+		this.composer.setDefinition(cloneJson(this.demoDefinition));
 		this.message = 'Reset to the Customer Risk Dashboard demo.';
 	}
 

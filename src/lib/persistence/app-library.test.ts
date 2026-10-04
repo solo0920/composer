@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { AppDocument } from '../domain/apps/app-document';
 import { createDemoDefinition, PREVIEW_CONTEXT } from '../demo/customer-risk-dashboard';
+import { createDemoFlows } from '../demo/customer-risk-dashboard.flows';
+import { stackRegistry } from '../registry';
 import { registryLookup } from '../registry';
 import {
 	APP_KEY_PREFIX,
@@ -38,6 +40,7 @@ function makeApp(overrides: Partial<AppDocument> = {}): AppDocument {
 		updatedAt: now,
 		definition: createDemoDefinition(),
 		context: { ...PREVIEW_CONTEXT },
+		flows: createDemoFlows(),
 		...overrides
 	};
 }

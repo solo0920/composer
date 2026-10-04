@@ -4,7 +4,8 @@
 	import Composer from '$lib/composer/Composer.svelte';
 	import { validateUIDefinition } from '$lib/domain/definitions/ui-definition.schema';
 	import { createDemoDefinition } from '$lib/demo/customer-risk-dashboard';
-	import { apiRegistry, componentRegistry, registryLookup } from '$lib/registry';
+	import { createDemoFlows } from '$lib/demo/customer-risk-dashboard.flows';
+	import { apiRegistry, componentRegistry, registryLookup, stackRegistry } from '$lib/registry';
 	import { createApiClient } from '$lib/runtime/api-client';
 	import { PreviewRuntime } from '$lib/runtime/preview-runtime.svelte';
 
@@ -13,7 +14,9 @@
 		componentRegistry,
 		apiRegistry,
 		registryLookup,
-		createDemoDefinition()
+		stackRegistry,
+		createDemoDefinition(),
+		createDemoFlows()
 	);
 
 	const previewRuntime = new PreviewRuntime(apiRegistry, createApiClient());
@@ -65,6 +68,7 @@
 	{workspace}
 	{componentRegistry}
 	{apiRegistry}
+	{stackRegistry}
 	{preview}
 	{jsonError}
 	onapplyjson={applyJson}

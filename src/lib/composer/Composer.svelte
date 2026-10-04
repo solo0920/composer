@@ -2,6 +2,7 @@
 	import type { JsonObject } from '$lib/domain/json';
 	import type { ApiRegistry } from '$lib/registry/api-registry';
 	import type { ComponentRegistry } from '$lib/registry/component-registry';
+import type { StackRegistry } from '$lib/registry/stack-registry';
 	import type { Workspace } from '../apps/workspace.svelte';
 	import RuntimeRenderer from '$lib/runtime/RuntimeRenderer.svelte';
 	import type { PreviewData } from '$lib/runtime/preview-runtime.svelte';
@@ -11,7 +12,8 @@
 	import Canvas from './canvas/Canvas.svelte';
 	import Inspector from './inspector/Inspector.svelte';
 	import JsonView from './json-view/JsonView.svelte';
-	import OpenAppDialog from '../apps/OpenAppDialog.svelte';
+	import BindingPanel from './binding-editor/BindingPanel.svelte';
+import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 	import SettingsDialog from '../apps/SettingsDialog.svelte';
 	import Toolbar from './Toolbar.svelte';
 
@@ -24,6 +26,7 @@
 		workspace,
 		componentRegistry,
 		apiRegistry,
+		stackRegistry,
 		preview,
 		jsonError,
 		onapplyjson
@@ -31,6 +34,7 @@
 		workspace: Workspace;
 		componentRegistry: ComponentRegistry;
 		apiRegistry: ApiRegistry;
+		stackRegistry: StackRegistry;
 		preview: PreviewData;
 		jsonError: string | null;
 		onapplyjson: (raw: string) => void;
@@ -42,6 +46,8 @@
 	const selectedDef = $derived(composer.selectedComponentDefinition);
 	const insertTarget = $derived(composer.insertParentId);
 	const hasApp = $derived(workspace.app !== null);
+
+	let workspaceView = $state<'compose' | 'binding'>('compose');
 
 	// One flag per dialog so each can be bound directly.
 	let openNew = $state(false);
@@ -85,6 +91,7 @@
 		onviewchange={(view) => (composer.view = view)}
 		onreset={() => workspace.resetToDemo()}
 		onfilecommand={run}
+		bind:workspaceView
 	/>
 
 	{#if composer.mode === 'preview' && hasApp}
@@ -99,6 +106,12 @@
 				/>
 			</div>
 		</main>
+	{:else if workspaceView === 'binding'}
+		<BindingPanel
+			flows={workspace.flows}
+			registry={stackRegistry}
+			onselectstack={(flowId, nodeId, stackId) => workspace.setNodeStack(flowId, nodeId, stackId)}
+		/>
 	{:else}
 		<div class="flex min-h-0 flex-1">
 			<ComponentPalette

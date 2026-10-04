@@ -1,4 +1,5 @@
 import type { UIDefinition } from '../definitions/ui-definition';
+import type { FlowDefinition } from '../flows/flow-definition';
 import type { JsonObject } from '../json';
 
 /**
@@ -14,6 +15,8 @@ export type AppDocument = {
 	definition: UIDefinition;
 	/** Values available to `$context.*` expressions in bindings. */
 	context: JsonObject;
+	/** End-to-end journeys and the technology stack chosen for each node. */
+	flows: FlowDefinition[];
 };
 
 /** Lightweight row for the app library list, without the definition body. */

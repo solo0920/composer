@@ -1,8 +1,21 @@
 import type { AppDocument } from '../domain/apps/app-document';
+import type { FlowDefinition } from '../domain/flows/flow-definition';
 import { createUIDefinition } from '../domain/definitions/ui-definition.factory';
 import type { JsonObject } from '../domain/json';
 
 let sequence = 0;
+
+/**
+ * Deep-copies JSON-shaped domain data.
+ *
+ * `structuredClone` cannot be used here because values read out of Svelte
+ * `$state` are proxies, and proxies are not cloneable. Definitions, flows and
+ * context are JSON by construction, so a JSON round trip is both correct and
+ * the only thing that works at this boundary.
+ */
+export function cloneJson<T>(value: T): T {
+	return JSON.parse(JSON.stringify(value)) as T;
+}
 
 /** Monotonic, collision-resistant enough for a single-browser app library. */
 export function newAppId(prefix = 'app'): string {
@@ -16,7 +29,11 @@ export function newDefinitionId(prefix = 'def'): string {
 	return newAppId(prefix);
 }
 
-export function createBlankApp(name: string, context: JsonObject): AppDocument {
+export function createBlankApp(
+	name: string,
+	context: JsonObject,
+	flows: FlowDefinition[]
+): AppDocument {
 	const now = new Date().toISOString();
 	return {
 		id: newAppId(),
@@ -24,19 +41,25 @@ export function createBlankApp(name: string, context: JsonObject): AppDocument {
 		createdAt: now,
 		updatedAt: now,
 		definition: createUIDefinition(name, newDefinitionId()),
-		context: { ...context }
+		context: { ...context },
+		flows: cloneJson(flows)
 	};
 }
 
-export function blankAppWithDemo(name: string, demoDefinition: AppDocument['definition']): AppDocument {
+export function blankAppWithDemo(
+	name: string,
+	demoDefinition: AppDocument['definition'],
+	flows: FlowDefinition[]
+): AppDocument {
 	const now = new Date().toISOString();
 	return {
 		id: newAppId(),
 		name,
 		createdAt: now,
 		updatedAt: now,
-		definition: structuredClone(demoDefinition),
-		context: {}
+		definition: cloneJson(demoDefinition),
+		context: {},
+		flows: cloneJson(flows)
 	};
 }
 
@@ -49,8 +72,9 @@ export function copyAsNewApp(app: AppDocument, name: string): AppDocument {
 		name,
 		createdAt: now,
 		updatedAt: now,
-		definition: structuredClone(app.definition),
-		context: { ...app.context }
+		definition: cloneJson(app.definition),
+		context: { ...app.context },
+		flows: cloneJson(app.flows)
 	};
 }
 

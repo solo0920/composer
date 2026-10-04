@@ -16,7 +16,8 @@
 		onmodechange,
 		onviewchange,
 		onreset,
-		onfilecommand
+		onfilecommand,
+		workspaceView = $bindable<'compose' | 'binding'>('compose')
 	}: {
 		appName: string;
 		mode: ComposerMode;
@@ -28,6 +29,7 @@
 		onviewchange: (view: ComposerView) => void;
 		onreset: () => void;
 		onfilecommand: (command: 'new' | 'open' | 'save' | 'saveAs' | 'export' | 'settings') => void;
+		workspaceView?: 'compose' | 'binding';
 	} = $props();
 </script>
 
@@ -67,6 +69,29 @@
 				<TabsTrigger value="json">JSON</TabsTrigger>
 			</TabsList>
 		</Tabs>
+
+		<div class="flex items-center gap-1" data-testid="workspace-view">
+			<Button
+				size="sm"
+				variant={workspaceView === 'compose' ? 'secondary' : 'ghost'}
+				data-testid="view-compose"
+				onclick={() => {
+					workspaceView = 'compose';
+				}}
+			>
+				Compose
+			</Button>
+			<Button
+				size="sm"
+				variant={workspaceView === 'binding' ? 'secondary' : 'ghost'}
+				data-testid="view-binding"
+				onclick={() => {
+					workspaceView = 'binding';
+				}}
+			>
+				Binding
+			</Button>
+		</div>
 	{/if}
 
 	<div class="ml-auto flex items-center gap-2">

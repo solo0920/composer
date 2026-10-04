@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '../result';
+import { parseFlows } from '../flows/flow-definition.schema';
 import type { AppDocument, AppIndex } from './app-document';
 
 /**
@@ -16,7 +17,8 @@ const appDocumentSchema = z.object({
 	createdAt: z.string().min(1),
 	updatedAt: z.string().min(1),
 	definition: z.unknown(),
-	context: jsonObjectSchema
+	context: jsonObjectSchema,
+	flows: z.unknown()
 });
 
 const appIndexSchema = z.object({
@@ -40,7 +42,10 @@ export function parseAppDocument(value: unknown): Result<AppDocument> {
 			`Invalid app: ${path.length > 0 ? `${path}: ` : ''}${first?.message ?? 'malformed document'}`
 		);
 	}
-	return ok(parsed.data as AppDocument);
+	const flows = parseFlows(parsed.data.flows);
+	if (!flows.ok) return flows;
+
+	return ok({ ...(parsed.data as AppDocument), flows: flows.value });
 }
 
 export function parseAppIndex(value: unknown): Result<AppIndex> {

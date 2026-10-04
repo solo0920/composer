@@ -2,6 +2,8 @@ import { createApiRegistry } from './api-registry';
 import { apiDefinitions } from './api-definitions';
 import { createComponentRegistry } from './component-registry';
 import { componentDefinitions } from './component-definitions';
+import { createStackRegistry } from './stack-registry';
+import { stackDefinitions } from './stack-definitions';
 import type { RegistryLookup } from '../domain/definitions/ui-definition.schema';
 
 /**
@@ -10,6 +12,7 @@ import type { RegistryLookup } from '../domain/definitions/ui-definition.schema'
  */
 export const componentRegistry = createComponentRegistry(componentDefinitions);
 export const apiRegistry = createApiRegistry(apiDefinitions);
+export const stackRegistry = createStackRegistry(stackDefinitions);
 
 /**
  * The registries viewed through the port that domain validation depends on.

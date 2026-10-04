@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Workspace } from './workspace.svelte';
-import { registryLookup } from '../registry';
+import { registryLookup, stackRegistry } from '../registry';
 import { createDemoDefinition } from '../demo/customer-risk-dashboard';
+import { createDemoFlows } from '../demo/customer-risk-dashboard.flows';
 import { appKey, listApps, type AppStorage } from '../persistence/app-library';
 import { blankAppWithDemo, copyAsNewApp, createBlankApp, slugify } from './app-factory';
 
@@ -26,7 +27,15 @@ const components = {
 const apis = { list: () => [], get: () => undefined, has: () => false, listByCategory: () => [] };
 
 function makeWorkspace(storage = memoryStorage()) {
-	const workspace = new Workspace(storage, components, apis, registryLookup, createDemoDefinition());
+	const workspace = new Workspace(
+		storage,
+		components,
+		apis,
+		registryLookup,
+		stackRegistry,
+		createDemoDefinition(),
+		createDemoFlows()
+	);
 	return { workspace, storage };
 }
 
@@ -283,9 +292,109 @@ describe('reset', () => {
 	});
 });
 
+describe('binding panel: choosing a node stack', () => {
+	it('starts with the demo flows and every node active', () => {
+		const { workspace } = makeWorkspace();
+		workspace.start();
+
+		expect(workspace.flows).toHaveLength(2);
+		expect(workspace.flows.flatMap((f) => f.nodes)).toHaveLength(7);
+	});
+
+	it('switches a node to another valid stack for its role', () => {
+		const { workspace } = makeWorkspace();
+		workspace.start();
+
+		workspace.setNodeStack('preview', 'render-preview', 'json-render');
+
+		const node = workspace.flows
+			.find((f) => f.id === 'preview')!
+			.nodes.find((n) => n.id === 'render-preview')!;
+		expect(node.stack).toBe('json-render');
+		expect(workspace.message).toBe('Render the definition now uses json-render.');
+		expect(workspace.composer.dirty).toBe(true);
+	});
+
+	it('allows switching a data node to GraphQL even though it is unimplemented', () => {
+		const { workspace } = makeWorkspace();
+		workspace.start();
+
+		workspace.setNodeStack('preview', 'fetch-risk', 'graphql');
+		expect(workspace.flows.find((f) => f.id === 'preview')!.nodes.find((n) => n.id === 'fetch-risk')!.stack).toBe(
+			'graphql'
+		);
+	});
+
+	it('refuses a stack that cannot serve the node role', () => {
+		const { workspace } = makeWorkspace();
+		workspace.start();
+
+		workspace.setNodeStack('preview', 'render-preview', 'rest-http');
+
+		const node = workspace.flows
+			.find((f) => f.id === 'preview')!
+			.nodes.find((n) => n.id === 'render-preview')!;
+		// Reverted rather than left in an impossible state.
+		expect(node.stack).toBe('svelte-runtime');
+		expect(workspace.message).toBe(
+			'Invalid flows: stack "rest-http" cannot serve role "render" (node "render-preview")'
+		);
+	});
+
+	it('refuses an unknown stack', () => {
+		const { workspace } = makeWorkspace();
+		workspace.start();
+
+		workspace.setNodeStack('preview', 'render-preview', 'carrier-pigeon');
+		expect(workspace.message).toBe('Unknown technology stack: carrier-pigeon');
+	});
+
+	it('reports an unknown node', () => {
+		const { workspace } = makeWorkspace();
+		workspace.start();
+
+		workspace.setNodeStack('preview', 'does-not-exist', 'json-render');
+		expect(workspace.message).toBe('Unknown node: does-not-exist');
+	});
+
+	it('reports an unknown flow by not finding the node', () => {
+		const { workspace } = makeWorkspace();
+		workspace.start();
+
+		workspace.setNodeStack('no-such-flow', 'render-preview', 'json-render');
+		expect(workspace.message).toBe('Unknown node: render-preview');
+	});
+
+	it('persists the chosen stack', () => {
+		const storage = memoryStorage();
+		const first = makeWorkspace(storage);
+		first.workspace.start();
+		first.workspace.setNodeStack('preview', 'render-preview', 'json-render');
+		first.workspace.save();
+
+		const second = makeWorkspace(storage);
+		second.workspace.start();
+		expect(
+			second.workspace.flows.find((f) => f.id === 'preview')!.nodes.find((n) => n.id === 'render-preview')!.stack
+		).toBe('json-render');
+	});
+
+	it('carries flows into a new app and restores them on reset', () => {
+		const { workspace } = makeWorkspace();
+		workspace.start();
+		workspace.setNodeStack('preview', 'render-preview', 'json-render');
+		workspace.newApp('Carried');
+
+		expect(workspace.flows.find((f) => f.id === 'preview')!.nodes[0].stack).toBe('json-render');
+
+		workspace.resetToDemo();
+		expect(workspace.flows.find((f) => f.id === 'preview')!.nodes[0].stack).toBe('svelte-runtime');
+	});
+});
+
 describe('app factory', () => {
 	it('creates an empty definition for a blank app', () => {
-		const app = createBlankApp('Fresh', { customerId: 'X' });
+		const app = createBlankApp('Fresh', { customerId: 'X' }, []);
 		expect(app.name).toBe('Fresh');
 		expect(app.definition.components).toEqual([]);
 		expect(app.context).toEqual({ customerId: 'X' });
@@ -293,21 +402,21 @@ describe('app factory', () => {
 
 	it('gives each new app a unique id', () => {
 		const ids = new Set(
-			Array.from({ length: 20 }, () => createBlankApp('A', {}).id)
+			Array.from({ length: 20 }, () => createBlankApp('A', {}, []).id)
 		);
 		expect(ids.size).toBe(20);
 	});
 
 	it('deep-copies the demo so the demo definition is never mutated', () => {
 		const demo = createDemoDefinition();
-		const app = blankAppWithDemo('Copy', demo);
+		const app = blankAppWithDemo('Copy', demo, createDemoFlows());
 		app.definition.components.pop();
 
 		expect(demo.components).toHaveLength(4);
 	});
 
 	it('copies an app without sharing the definition object', () => {
-		const original = createBlankApp('A', {});
+		const original = createBlankApp('A', {}, []);
 		const copy = copyAsNewApp(original, 'B');
 		copy.definition.name = 'changed';
 
