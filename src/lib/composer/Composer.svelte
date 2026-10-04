@@ -16,7 +16,8 @@ import type { StackRegistry } from '$lib/registry/stack-registry';
 import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 	import SettingsDialog from '../apps/SettingsDialog.svelte';
 	import Toolbar from './Toolbar.svelte';
-	import { STAGES } from './stages';
+	import { STAGES, type LayoutPresentation } from './stages';
+	import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs/index.js';
 
 	/**
 	 * Composer shell. Holds no definition state of its own: everything renders
@@ -86,12 +87,10 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 		stages={STAGES}
 		appName={definition.name}
 		activeStage={composer.activeStage}
-		layoutPresentation={composer.layoutPresentation}
 		dirty={composer.dirty}
 		{hasApp}
 		message={workspace.message}
 		onstagechange={(stage) => composer.selectStage(stage)}
-		onpresentationchange={(value) => composer.setLayoutPresentation(value)}
 		onreset={() => workspace.resetToDemo()}
 		onfilecommand={run}
 	/>
@@ -124,17 +123,38 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 				onadd={(type) => composer.addComponent(type)}
 			/>
 
-			{#if composer.layoutPresentation === 'visual'}
-				<Canvas
-					{definition}
-					selectedId={composer.selectedComponentId}
-					onselect={(id) => composer.selectComponent(id)}
-				/>
-			{:else}
-				<div class="flex-1 overflow-y-auto">
-					<JsonView json={toJson(definition)} error={jsonError} onapply={onapplyjson} />
+			<!-- The layout stage owns its own presentation control (FR-010). It lives
+			     here rather than in the header because it means nothing on the other two
+			     stages, and the choice is part of how this stage is worked on. -->
+			<div class="flex min-w-0 flex-1 flex-col">
+				<div
+					class="flex items-center gap-2 border-b border-border px-4 py-1.5"
+					data-testid="layout-presentation-bar"
+				>
+					<span class="text-xs font-medium text-muted-foreground">Presentation</span>
+					<Tabs
+						value={composer.layoutPresentation}
+						onValueChange={(next) => composer.setLayoutPresentation(next as LayoutPresentation)}
+					>
+						<TabsList>
+							<TabsTrigger value="visual">Visual</TabsTrigger>
+							<TabsTrigger value="json">JSON</TabsTrigger>
+						</TabsList>
+					</Tabs>
 				</div>
-			{/if}
+
+				{#if composer.layoutPresentation === 'visual'}
+					<Canvas
+						{definition}
+						selectedId={composer.selectedComponentId}
+						onselect={(id) => composer.selectComponent(id)}
+					/>
+				{:else}
+					<div class="flex-1 overflow-y-auto">
+						<JsonView json={toJson(definition)} error={jsonError} onapply={onapplyjson} />
+					</div>
+				{/if}
+			</div>
 
 			{#if selected && selectedDef}
 				<Inspector

@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
-	import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs/index.js';
-	import type { LayoutPresentation, Stage, StageId } from './stages';
+	import type { Stage, StageId } from './stages';
 	import FileMenu from '../apps/FileMenu.svelte';
 	import WorkflowRoadmap from './workflow/WorkflowRoadmap.svelte';
 
@@ -12,30 +11,26 @@
 	 * The workflow stages live inline here rather than in a second bar above it, and
 	 * the earlier `Compose`/`Binding` and `Edit`/`Preview` toggles are gone: they
 	 * duplicated the stage control. Exactly one control group now decides what the
-	 * workspace shows.
+	 * workspace shows, and this bar carries only controls that apply to every stage.
 	 */
 	let {
 		appName,
 		stages,
 		activeStage,
-		layoutPresentation,
 		dirty,
 		hasApp,
 		message,
 		onstagechange,
-		onpresentationchange,
 		onreset,
 		onfilecommand
 	}: {
 		appName: string;
 		stages: readonly Stage[];
 		activeStage: StageId;
-		layoutPresentation: LayoutPresentation;
 		dirty: boolean;
 		hasApp: boolean;
 		message: string | null;
 		onstagechange: (stage: StageId) => void;
-		onpresentationchange: (value: LayoutPresentation) => void;
 		onreset: () => void;
 		onfilecommand: (command: 'new' | 'open' | 'save' | 'saveAs' | 'export' | 'settings') => void;
 	} = $props();
@@ -56,9 +51,6 @@
 			: 'text-destructive'
 	);
 
-	// The presentation control only applies to the layout stage, so it is never
-	// offered where it would have no effect.
-	const showsLayoutPresentation = $derived(activeStage === 'layout');
 </script>
 
 <header
@@ -82,18 +74,6 @@
 			>
 		{/if}
 	</div>
-
-	{#if showsLayoutPresentation}
-		<Tabs
-			value={layoutPresentation}
-			onValueChange={(next) => onpresentationchange(next as LayoutPresentation)}
-		>
-			<TabsList>
-				<TabsTrigger value="visual">Visual</TabsTrigger>
-				<TabsTrigger value="json">JSON</TabsTrigger>
-			</TabsList>
-		</Tabs>
-	{/if}
 
 	<div class="ml-auto flex items-center gap-2">
 		{#if message}

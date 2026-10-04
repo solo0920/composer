@@ -186,6 +186,54 @@ describe('Composer: layout presentation belongs to the layout stage', () => {
 		expect(presentationControl(container)).toBeNull();
 	});
 
+	it('keeps the presentation control in the layout stage, not in the header', () => {
+		const { container } = mount();
+
+		// FR-010: the control appears nowhere except the layout stage, so it must not
+		// sit in the header that spans every stage.
+		const header = container.querySelector('[data-testid="composer-header"]')!;
+		expect(header.querySelector('[role="tablist"]')).toBeNull();
+
+		expect(
+			container.querySelector('[data-testid="layout-presentation-bar"] [role="tablist"]')
+		).not.toBeNull();
+	});
+
+	it('defaults the layout stage to the visual presentation', () => {
+		const { container } = mount();
+		const selected = [...container.querySelectorAll('[role="tab"]')]
+			.filter((node) => node.getAttribute('data-state') === 'active')
+			.map((node) => node.textContent?.trim());
+		expect(selected).toEqual(['Visual']);
+		expect(hasCanvas(container)).toBe(true);
+	});
+
+	it('preserves the structured view through a full round trip of every stage', async () => {
+		const { container } = mount();
+		const toJson = () =>
+			fireEvent.click(
+				[...container.querySelectorAll('[role="tab"]')].find(
+					(node) => node.textContent?.trim() === 'JSON'
+				)!
+			);
+		const inJsonView = () =>
+			container.querySelector('textarea[aria-label="UI definition JSON"]') !== null;
+
+		await toJson();
+		expect(inJsonView()).toBe(true);
+
+		// The constraint is verbatim: the choice MUST survive leaving and re-entering
+		// the layout stage. Visit every other stage on the way round, not just one.
+		for (const stage of ['binding', 'preview', 'binding'] as const) {
+			await clickStage(container, stage);
+			expect(presentationControl(container)).toBeNull();
+		}
+
+		await clickStage(container, 'layout');
+		expect(inJsonView()).toBe(true);
+		expect(hasCanvas(container)).toBe(false);
+	});
+
 	it('renders the structured view instead of the canvas when selected', async () => {
 		const { container } = mount();
 		const jsonTab = [...container.querySelectorAll('[role="tab"]')].find(

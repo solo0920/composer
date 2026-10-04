@@ -30,6 +30,36 @@ test.beforeEach(async ({ page }) => {
 	await expect(page.getByTestId('workflow-roadmap')).toBeVisible();
 });
 
+test('the presentation control belongs to the layout stage alone', async ({ page }) => {
+	// FR-010: the control appears on the layout stage and nowhere else.
+	await expect(page.getByRole('tab', { name: 'Visual' })).toBeVisible();
+	await expect(page.getByRole('tab', { name: 'JSON' })).toBeVisible();
+
+	await goToStage(page, 'binding');
+	await expect(page.getByRole('tablist')).toHaveCount(0);
+
+	await goToStage(page, 'preview');
+	await expect(page.getByRole('tablist')).toHaveCount(0);
+
+	// It is not in the header, which is present on every stage.
+	await expect(page.getByTestId('composer-header').locator('[role="tablist"]')).toHaveCount(0);
+});
+
+test('the structured view survives leaving and re-entering the layout stage', async ({ page }) => {
+	await page.getByRole('tab', { name: 'JSON' }).click();
+	await expect(page.getByLabel('UI definition JSON')).toBeVisible();
+
+	for (const stage of ['binding', 'preview'] as const) {
+		await goToStage(page, stage);
+	}
+
+	await goToStage(page, 'layout');
+	// Still structured, not silently reverted to the canvas.
+	await expect(page.getByRole('tab', { name: 'JSON' })).toHaveAttribute('data-state', 'active');
+	await expect(page.getByLabel('UI definition JSON')).toBeVisible();
+	await expect(page.getByTestId('canvas-grid')).toHaveCount(0);
+});
+
 test('every stage is reachable and operable by keyboard alone', async ({ page }) => {
 	const stage = (id: 'binding' | 'layout' | 'preview') =>
 		page.locator(`[data-testid="workflow-stage"][data-stage-id="${id}"]`);

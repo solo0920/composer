@@ -17,9 +17,19 @@ export default defineConfig({
 	testDir: 'e2e',
 	fullyParallel: true,
 	reporter: process.env.CI ? 'line' : [['list']],
+	// Measured on this machine: with the 16 workers a 32-core host defaults to,
+	// the composer needs ~6.0-6.5s to become interactive, which overruns
+	// Playwright's 5s default and made the readiness gate fail intermittently.
+	// The application is not slow -- the preview server is serving 16 browsers at
+	// once -- so the harness timeout is raised rather than the app being changed.
+	// This is the top-level TestConfig key; putting it under `use` was measured to
+	// have no effect on these assertions.
+	expect: { timeout: 15_000 },
 	use: {
 		baseURL: 'http://localhost:4173',
-		trace: 'on-first-retry'
+		trace: 'on-first-retry',
+		actionTimeout: 15_000,
+		navigationTimeout: 30_000
 	},
 	webServer: {
 		command: 'npm run build && npm run preview -- --port 4173',
