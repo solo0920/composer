@@ -139,6 +139,8 @@ These are deliberate, not oversights:
 - The JSON tab is read-oriented by default. `Apply JSON` already routes edits
   through the same validation as storage, so two-way sync needs no new plumbing.
 - Column/span are edited in the Inspector; there is no drag or resize.
+- Components are a flat list. `Container` renders a framed region but the
+  definition has no nesting, so it cannot hold children yet.
 - The Button component has no event handling.
 - Layout is a single fixed 12-column grid, with no responsive breakpoint.
 
