@@ -151,6 +151,173 @@ test('shows a readable binding error when the API request fails', async ({ page 
 	);
 });
 
+test('creates a new app from the File menu', async ({ page }) => {
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-new').click();
+
+	await page.getByTestId('app-name-input').fill('Operations Console');
+	await page.getByTestId('app-name-confirm').click();
+
+	await expect(page.getByTestId('app-name')).toHaveText('Operations Console');
+	await expect(page.getByTestId('canvas-grid')).toHaveCount(0);
+	await expect(page.getByTestId('toolbar-message')).toContainText('Created "Operations Console".');
+
+	// The new app is persisted immediately, so a reload reopens it.
+	await page.reload();
+	await expect(page.getByTestId('app-name')).toHaveText('Operations Console');
+});
+
+test('refuses to create an app without a name', async ({ page }) => {
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-new').click();
+	await page.getByTestId('app-name-input').fill('   ');
+	// The confirm button is disabled by the form's required rule / no-op handler.
+	await page.getByTestId('app-name-confirm').click();
+	await expect(page.getByTestId('app-name')).toHaveText('Customer Risk Dashboard');
+});
+
+test('opens and switches between saved apps', async ({ page }) => {
+	// Build a second app with a distinctive component.
+	await page.getByTestId('palette-item').filter({ hasText: 'Button' }).click();
+	await page.getByTestId('save').click();
+
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-new').click();
+	await page.getByTestId('app-name-input').fill('Second App');
+	await page.getByTestId('app-name-confirm').click();
+	await expect(page.locator('[data-testid="canvas-item"]')).toHaveCount(0);
+
+	// The library lists both apps.
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-open').click();
+	await expect(page.getByTestId('open-app-item')).toHaveCount(2);
+
+	await page
+		.getByTestId('open-app-item')
+		.filter({ hasText: 'Customer Risk Dashboard' })
+		.click();
+
+	await expect(page.getByTestId('app-name')).toHaveText('Customer Risk Dashboard');
+	await expect(page.locator('[data-testid="canvas-item"]')).toHaveCount(5);
+	await expect(page.getByTestId('toolbar-message')).toContainText('Opened "Customer Risk Dashboard".');
+});
+
+test('save as creates an independent copy', async ({ page }) => {
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-save-as').click();
+	await page.getByTestId('app-name-input').fill('Dashboard Copy');
+	await page.getByTestId('app-name-confirm').click();
+
+	await expect(page.getByTestId('app-name')).toHaveText('Dashboard Copy');
+	await expect(page.getByTestId('toolbar-message')).toContainText('Saved as "Dashboard Copy".');
+
+	// The copy starts from the same definition.
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-open').click();
+	await expect(page.getByTestId('open-app-item')).toHaveCount(2);
+	await page.getByTestId('close-open-app').click();
+
+	// Editing the copy leaves the original alone.
+	await page.locator('[data-testid="canvas-item"]').first().click();
+	await page.getByTestId('delete-component').click();
+	await page.getByTestId('save').click();
+	await expect(page.locator('[data-testid="canvas-item"]')).toHaveCount(3);
+
+	await page.reload();
+	await expect(page.getByTestId('app-name')).toHaveText('Dashboard Copy');
+	await expect(page.locator('[data-testid="canvas-item"]')).toHaveCount(3);
+
+	// The original still has all four demo components.
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-open').click();
+	await page
+		.getByTestId('open-app-item')
+		.filter({ hasText: 'Customer Risk Dashboard' })
+		.click();
+	await expect(page.locator('[data-testid="canvas-item"]')).toHaveCount(4);
+});
+
+test('exports the app as a JSON download', async ({ page }) => {
+	// The download starts inside the click handler, so the listener has to be
+	// attached before clicking.
+	const downloaded = page.waitForEvent('download');
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-export').click();
+
+	const download = await downloaded;
+	expect(download.suggestedFilename()).toBe('customer-risk-dashboard.uidc.json');
+
+	const stream = await download.createReadStream();
+	const chunks: Buffer[] = [];
+	for await (const chunk of stream) chunks.push(chunk as Buffer);
+	const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+
+	expect(payload.format).toBe('uidc.app');
+	expect(payload.name).toBe('Customer Risk Dashboard');
+	expect(payload.definition.components).toHaveLength(4);
+	expect(payload.definition.components[1].binding.api).toBe('customer.getProfile');
+	expect(payload.context).toEqual({ customerId: 'CUST-1001' });
+
+	await expect(page.getByTestId('toolbar-message')).toContainText('Exported "Customer Risk Dashboard".');
+});
+
+test('deletes an app from the library', async ({ page }) => {
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-new').click();
+	await page.getByTestId('app-name-input').fill('Throwaway');
+	await page.getByTestId('app-name-confirm').click();
+
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-open').click();
+	await expect(page.getByTestId('open-app-item')).toHaveCount(2);
+
+	await page.getByTestId('delete-app').first().click();
+	await expect(page.getByTestId('open-app-item')).toHaveCount(1);
+});
+
+test('settings changes the grid width and the $context values', async ({ page }) => {
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-settings').click();
+	await expect(page.getByTestId('settings-dialog')).toBeVisible();
+
+	await page.getByTestId('settings-name').fill('Risk Console');
+	await page.getByTestId('settings-columns').fill('6');
+	await page.getByTestId('settings-apply').click();
+
+	await expect(page.getByTestId('app-name')).toHaveText('Risk Console');
+	await expect(page.getByTestId('toolbar-message')).toContainText('Settings applied.');
+
+	// The narrower grid is visible in the canvas.
+	await page.getByTestId('palette-item').filter({ hasText: 'Text' }).click();
+	const grid = page.getByTestId('canvas-grid');
+	await expect(grid).toHaveAttribute('style', /repeat\(6,/);
+
+	// Changing $context.customerId changes the data the mock API returns.
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-settings').click();
+	await page.getByTestId('settings-context-key').first().fill('customerId');
+	await page.getByTestId('settings-context-value').first().fill('CUST-1002');
+	await page.getByTestId('settings-apply').click();
+
+	await page.getByTestId('save').click();
+	await page.getByTestId('preview-toggle').click();
+	await expect(page.getByTestId('runtime-root')).toContainText('Grace Hopper');
+});
+
+test('renders an empty app without crashing', async ({ page }) => {
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-new').click();
+	await page.getByTestId('app-name-input').fill('Blank');
+	await page.getByTestId('app-name-confirm').click();
+
+	await expect(page.getByTestId('canvas-grid')).toHaveCount(0);
+	await expect(page.getByText('Add one from the palette')).toBeVisible();
+
+	await page.getByTestId('preview-toggle').click();
+	await expect(page.getByTestId('preview-title')).toHaveText('Blank');
+	await expect(page.getByTestId('runtime-root')).toHaveCount(1);
+});
+
 test('collapses and expands palette categories', async ({ page }) => {
 	const layout = page.locator('[data-testid="palette-category"][data-category="Layout"]');
 	const basic = page.locator('[data-testid="palette-category"][data-category="Basic"]');

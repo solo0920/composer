@@ -27,5 +27,13 @@ export default defineConfig({
 		reuseExistingServer: !process.env.CI,
 		timeout: 180_000
 	},
-	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
+	projects: [
+		{
+			name: 'chromium',
+			// Use the full Chromium build rather than chrome-headless-shell: the
+			// lightweight shell does not implement downloads, and the Export flow
+			// is only verifiable end to end with real browser semantics.
+			use: { ...devices['Desktop Chrome'], channel: 'chromium' }
+		}
+	]
 });

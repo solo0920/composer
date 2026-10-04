@@ -1,23 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { Workspace } from '$lib/apps/workspace.svelte';
 	import Composer from '$lib/composer/Composer.svelte';
-	import { ComposerState } from '$lib/composer/state/composer-state.svelte';
 	import { validateUIDefinition } from '$lib/domain/definitions/ui-definition.schema';
-	import { createDemoDefinition, PREVIEW_CONTEXT } from '$lib/demo/customer-risk-dashboard';
-	import {
-		clearDefinition,
-		loadDefinition,
-		saveDefinition
-	} from '$lib/persistence/definition-store';
+	import { createDemoDefinition } from '$lib/demo/customer-risk-dashboard';
 	import { apiRegistry, componentRegistry, registryLookup } from '$lib/registry';
 	import { createApiClient } from '$lib/runtime/api-client';
 	import { PreviewRuntime } from '$lib/runtime/preview-runtime.svelte';
 
-	
-	const composer = new ComposerState(componentRegistry, apiRegistry);
-	const previewRuntime = new PreviewRuntime(apiRegistry, createApiClient());
+	const workspace = new Workspace(
+		localStorage,
+		componentRegistry,
+		apiRegistry,
+		registryLookup,
+		createDemoDefinition()
+	);
 
-	let message = $state<string | null>(null);
+	const previewRuntime = new PreviewRuntime(apiRegistry, createApiClient());
 	let jsonError = $state<string | null>(null);
 
 	const preview = $derived({
@@ -29,50 +28,13 @@
 	// The Preview reads the same definition the Composer edits, so an edit is
 	// visible in the Preview without a second copy of the state.
 	$effect(() => {
-		const definition = composer.definition;
-		if (composer.mode !== 'preview') return;
-		void previewRuntime.load(definition, PREVIEW_CONTEXT);
+		const definition = workspace.composer.definition;
+		const context = workspace.context;
+		if (workspace.composer.mode !== 'preview') return;
+		void previewRuntime.load(definition, context);
 	});
 
-	onMount(() => {
-		const loaded = loadDefinition(localStorage, registryLookup);
-		if (loaded.ok) {
-			composer.setDefinition(loaded.value);
-			composer.markSaved();
-			message = 'Loaded saved definition.';
-		} else {
-			composer.setDefinition(createDemoDefinition());
-			composer.markSaved();
-		}
-	});
-
-	function save(): void {
-		const result = saveDefinition(localStorage, composer.definition);
-		if (result.ok) {
-			composer.markSaved();
-			message = `Saved at ${new Date().toLocaleTimeString()}.`;
-		} else {
-			message = result.error;
-		}
-	}
-
-	function load(): void {
-		const result = loadDefinition(localStorage, registryLookup);
-		if (result.ok) {
-			composer.setDefinition(result.value);
-			composer.markSaved();
-			message = 'Loaded saved definition.';
-		} else {
-			message = result.error;
-		}
-	}
-
-	function reset(): void {
-		clearDefinition(localStorage);
-		composer.setDefinition(createDemoDefinition());
-		composer.markSaved();
-		message = 'Reset to the Customer Risk Dashboard demo.';
-	}
+	onMount(() => workspace.start());
 
 	function applyJson(raw: string): void {
 		let parsed: unknown;
@@ -90,8 +52,8 @@
 		}
 
 		jsonError = null;
-		composer.setDefinition(validated.value);
-		message = 'Applied JSON to the definition.';
+		workspace.composer.setDefinition(validated.value);
+		workspace.message = 'Applied JSON to the definition.';
 	}
 </script>
 
@@ -100,15 +62,10 @@
 </svelte:head>
 
 <Composer
-	state={composer}
+	{workspace}
 	{componentRegistry}
 	{apiRegistry}
 	{preview}
-	{message}
 	{jsonError}
-	onmodechange={(mode) => (composer.mode = mode)}
-	onsave={save}
-	onload={load}
-	onreset={reset}
 	onapplyjson={applyJson}
 />
