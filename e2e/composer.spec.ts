@@ -151,6 +151,28 @@ test('shows a readable binding error when the API request fails', async ({ page 
 	);
 });
 
+test('collapses and expands palette categories', async ({ page }) => {
+	const layout = page.locator('[data-testid="palette-category"][data-category="Layout"]');
+	const basic = page.locator('[data-testid="palette-category"][data-category="Basic"]');
+
+	// Categories come from the Component Registry and start expanded.
+	await expect(layout).toHaveAttribute('aria-expanded', 'true');
+	await expect(basic).toHaveAttribute('aria-expanded', 'true');
+	await expect(page.getByTestId('palette-item')).toHaveCount(4);
+
+	await layout.click();
+	await expect(layout).toHaveAttribute('aria-expanded', 'false');
+	await expect(page.getByTestId('palette-item')).toHaveCount(3);
+	await expect(page.locator('section[data-category="Layout"] [data-testid="palette-item"]')).toHaveCount(0);
+
+	// Collapsing one category leaves the others alone.
+	await expect(basic).toHaveAttribute('aria-expanded', 'true');
+	await expect(page.locator('section[data-category="Basic"] [data-testid="palette-item"]')).toHaveCount(2);
+
+	await layout.click();
+	await expect(page.getByTestId('palette-item')).toHaveCount(4);
+});
+
 test('composes a nested component tree like a JSON spec', async ({ page }) => {
 	/** Direct children of a canvas cell, in DOM order. */
 	const childrenOf = (id: string) =>
