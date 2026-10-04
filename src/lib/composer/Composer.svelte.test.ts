@@ -262,3 +262,80 @@ describe('Composer: layout presentation belongs to the layout stage', () => {
 		expect(hasCanvas(container)).toBe(false);
 	});
 });
+describe('Composer: empty and unbound states still agree with the indicator', () => {
+	/** Deletes the open app, which is how a no-app-open state is actually reached. */
+	const closeTheApp = (workspace: Workspace) => {
+		const id = workspace.app?.id;
+		if (id === undefined) throw new Error('expected an open app to delete');
+		workspace.deleteAppById(id);
+	};
+
+	it('defaults to the layout stage and shows the canvas on first paint', () => {
+		// Data-model constraint, verbatim: "Default on load and after a reload:
+		// `layout`". Asserted on the very first render, before any interaction.
+		const { container } = mount();
+		expect(markedStage(container)).toBe('layout');
+		expect(hasCanvas(container)).toBe(true);
+	});
+
+	it('explains that no app is open instead of showing the preview stage content', async () => {
+		// FR-015. The reachable path is deleting the open app.
+		const { container, workspace } = mount();
+		closeTheApp(workspace);
+		expect(workspace.app).toBeNull();
+
+		// A stage is still marked, so the indicator never claims nothing is active.
+		expect(markedStage(container)).not.toBeNull();
+
+		await clickStage(container, 'preview');
+
+		// Selecting preview with no app must not fall through to the canvas: the
+		// marked stage and the shown content have to agree.
+		expect(markedStage(container)).toBe('preview');
+		expect(hasCanvas(container)).toBe(false);
+		expect(hasBinding(container)).toBe(false);
+		expect(container.querySelector('[data-testid="no-app-state"]')).not.toBeNull();
+	});
+
+	it('explains that nothing is bound rather than rendering a blank preview', async () => {
+		// FR-014. A new app has no components and therefore nothing bound.
+		const { container, workspace } = mount();
+		workspace.newApp('Empty');
+		await clickStage(container, 'preview');
+
+		expect(markedStage(container)).toBe('preview');
+		expect(container.querySelector('[data-testid="no-bindings-state"]')).not.toBeNull();
+	});
+
+	it('still shows a real preview once something is bound', async () => {
+		const { container, workspace } = mount();
+		workspace.newApp('Empty');
+		await clickStage(container, 'preview');
+		expect(container.querySelector('[data-testid="no-bindings-state"]')).not.toBeNull();
+
+		// Adding an unbound component is not enough: the explanation is about bindings,
+		// so it stays until something actually points at an API function.
+		const added = workspace.composer.addComponent('text');
+		if (!added) throw new Error('expected the text component to be added');
+		await clickStage(container, 'layout');
+		await clickStage(container, 'preview');
+		expect(container.querySelector('[data-testid="no-bindings-state"]')).not.toBeNull();
+
+		workspace.composer.setBinding(added.id, { api: 'customer.getProfile' });
+		await clickStage(container, 'layout');
+		await clickStage(container, 'preview');
+
+		expect(container.querySelector('[data-testid="no-bindings-state"]')).toBeNull();
+		// The rendered view is present in both states: the explanation is additive.
+		expect(hasPreview(container)).toBe(true);
+	});
+
+	it('leaves the binding stage usable when no app is open', async () => {
+		const { container, workspace } = mount();
+		closeTheApp(workspace);
+
+		await clickStage(container, 'binding');
+		expect(markedStage(container)).toBe('binding');
+		expect(hasBinding(container)).toBe(true);
+	});
+});

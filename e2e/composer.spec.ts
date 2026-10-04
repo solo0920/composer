@@ -60,6 +60,59 @@ test('the structured view survives leaving and re-entering the layout stage', as
 	await expect(page.getByTestId('canvas-grid')).toHaveCount(0);
 });
 
+test('the default stage after reload agrees with the content shown', async ({ page }) => {
+	// Quickstart Scenario 5 / data-model: "Default on load and after a reload:
+	// `layout`". The indicator and the content must agree both times.
+	await expect(page.locator('[data-stage-id="layout"]')).toHaveAttribute('aria-current', 'step');
+	await expect(page.getByTestId('canvas-grid')).toBeVisible();
+
+	await page.reload();
+
+	await expect(page.locator('[data-stage-id="layout"]')).toHaveAttribute('aria-current', 'step');
+	await expect(page.getByTestId('canvas-grid')).toBeVisible();
+	await expect(page.locator('[aria-current="step"]')).toHaveCount(1);
+	await expect(page.getByTestId('binding-panel')).toHaveCount(0);
+	await expect(page.getByTestId('preview-title')).toHaveCount(0);
+});
+
+test('explains that no app is open without switching the marked stage', async ({ page }) => {
+	await goToStage(page, 'preview');
+	await expect(page.getByTestId('preview-title')).toBeVisible();
+
+	// Deleting the open app is the reachable no-app path.
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-open').click();
+	await expect(page.getByTestId('open-app-dialog')).toBeVisible();
+	await page.locator('[data-testid="delete-app"]').first().click();
+	await page.getByTestId('close-open-app').click();
+
+	await expect(page.getByTestId('no-app-state')).toBeVisible();
+	await expect(page.getByTestId('no-app-state')).toContainText('No app is open');
+
+	// The indicator still marks the stage that was asked for, and no other stage's
+	// content has appeared underneath the explanation.
+	await expect(page.locator('[data-stage-id="preview"]')).toHaveAttribute('aria-current', 'step');
+	await expect(page.locator('[aria-current="step"]')).toHaveCount(1);
+	await expect(page.getByTestId('canvas-grid')).toHaveCount(0);
+	await expect(page.getByTestId('binding-panel')).toHaveCount(0);
+});
+
+test('explains that nothing is bound without hiding the rendered view', async ({ page }) => {
+	await page.getByTestId('file-menu').click();
+	await page.getByTestId('file-new').click();
+	await expect(page.getByTestId('new-app-dialog')).toBeVisible();
+	await page.getByTestId('app-name-input').fill('Unbound');
+	await page.getByTestId('app-name-confirm').click();
+
+	await goToStage(page, 'preview');
+
+	// Contract: "Rendered view shown; explains nothing is bound".
+	await expect(page.getByTestId('no-bindings-state')).toBeVisible();
+	await expect(page.getByTestId('no-bindings-state')).toContainText('Nothing is bound');
+	await expect(page.getByTestId('preview-title')).toHaveText('Unbound');
+	await expect(page.locator('[data-stage-id="preview"]')).toHaveAttribute('aria-current', 'step');
+});
+
 test('every stage is reachable and operable by keyboard alone', async ({ page }) => {
 	const stage = (id: 'binding' | 'layout' | 'preview') =>
 		page.locator(`[data-testid="workflow-stage"][data-stage-id="${id}"]`);

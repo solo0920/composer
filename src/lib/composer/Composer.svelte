@@ -49,6 +49,15 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 	const insertTarget = $derived(composer.insertParentId);
 	const hasApp = $derived(workspace.app !== null);
 
+	/**
+	 * Whether any component points at an API function. A definition with no bindings
+	 * still renders, so this drives an explanation (FR-014) rather than replacing the
+	 * rendered view.
+	 */
+	const hasBindings = $derived(
+		definition.components.some((component) => (component.binding?.api ?? '').trim() !== '')
+	);
+
 	// One flag per dialog so each can be bound directly.
 	let openNew = $state(false);
 	let openOpen = $state(false);
@@ -97,18 +106,46 @@ import OpenAppDialog from '../apps/OpenAppDialog.svelte';
 
 	<!-- The single stage-to-content mapping. Nothing else in the app decides what the
 	     workspace shows, so the active stage can never disagree with the content. -->
-	{#if composer.activeStage === 'preview' && hasApp}
-		<main class="flex-1 overflow-y-auto p-6">
-			<div class="mx-auto max-w-5xl">
-				<h1 class="mb-4 text-xl font-bold" data-testid="preview-title">{definition.name}</h1>
-				<RuntimeRenderer
-					{definition}
-					data={preview.data}
-					errors={preview.errors}
-					loading={preview.loading}
-				/>
-			</div>
-		</main>
+	{#if composer.activeStage === 'preview'}
+		{#if !hasApp}
+			<!-- FR-015: with no app open there is nothing to render, so the preview stage
+			     says so rather than falling through to another stage's content. The
+			     indicator keeps marking `preview`, which is the stage that was asked for. -->
+			<main
+				class="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center"
+				data-testid="no-app-state"
+			>
+				<p class="text-sm font-medium">No app is open</p>
+				<p class="max-w-md text-xs text-muted-foreground">
+					Open or create an app from the File menu to compose and preview it.
+				</p>
+			</main>
+		{:else}
+			<main class="flex-1 overflow-y-auto p-6">
+				<div class="mx-auto max-w-5xl">
+					<h1 class="mb-4 text-xl font-bold" data-testid="preview-title">{definition.name}</h1>
+
+					<!-- FR-014: the rendered view is still shown, but an app with nothing
+					     bound explains that instead of appearing broken. -->
+					{#if !hasBindings}
+						<div
+							class="mb-4 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
+							data-testid="no-bindings-state"
+						>
+							Nothing is bound in this app yet, so the preview shows the layout without
+							live data. Add a binding on the Binding stage to fill it in.
+						</div>
+					{/if}
+
+					<RuntimeRenderer
+						{definition}
+						data={preview.data}
+						errors={preview.errors}
+						loading={preview.loading}
+					/>
+				</div>
+			</main>
+		{/if}
 	{:else if composer.activeStage === 'binding'}
 		<BindingPanel
 			flows={workspace.flows}
