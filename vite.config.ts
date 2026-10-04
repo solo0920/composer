@@ -20,12 +20,32 @@ export default defineConfig({
 			adapter: adapter()
 		})
 	],
-	test: {
-		include: ['src/**/*.test.ts']
-	},
 	resolve: {
 		alias: {
 			$lib: fileURLToPath(new URL('./src/lib', import.meta.url))
-		}
+		},
+		// Component tests must resolve Svelte's browser build, not the SSR build.
+		conditions: ['browser']
+	},
+	test: {
+		projects: [
+			{
+				extends: true,
+				test: {
+					name: 'unit',
+					environment: 'node',
+					include: ['src/**/*.test.ts'],
+					exclude: ['src/**/*.svelte.test.ts']
+				}
+			},
+			{
+				extends: true,
+				test: {
+					name: 'dom',
+					environment: 'jsdom',
+					include: ['src/**/*.svelte.test.ts']
+				}
+			}
+		]
 	}
 });
