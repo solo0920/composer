@@ -16,6 +16,14 @@ describe('ComponentRegistry', () => {
 	it('returns undefined for an unknown component', () => {
 		expect(registry.get('RiskScore')).toBeUndefined();
 		expect(registry.has('RiskScore')).toBe(false);
+		expect(registry.acceptsChildren('RiskScore')).toBe(false);
+	});
+
+it('reports which components accept children', () => {
+		expect(registry.acceptsChildren('container')).toBe(true);
+		expect(registry.acceptsChildren('text')).toBe(false);
+		expect(registry.acceptsChildren('button')).toBe(false);
+		expect(registry.acceptsChildren('data-card')).toBe(false);
 	});
 
 	it('groups components by category in palette order', () => {

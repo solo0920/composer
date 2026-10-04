@@ -1,7 +1,7 @@
 import type { BindingDefinition } from '../bindings/binding-definition';
 import type { JsonObject } from '../json';
 
-/** Placement of one component instance inside the definition's 12-column grid. */
+/** Placement of one component instance inside its parent grid. */
 export type ComponentLayout = {
 	/** 1-based start column. */
 	column: number;
@@ -21,6 +21,8 @@ export type UIComponentInstance = {
 	type: string;
 	props: JsonObject;
 	layout: ComponentLayout;
+	/** Nested components laid out in their own grid inside this component. */
+	children?: UIComponentInstance[];
 	binding?: BindingDefinition;
 };
 
@@ -39,3 +41,10 @@ export type UIDefinition = {
 
 export const DEFINITION_VERSION = 1;
 export const DEFAULT_GRID_COLUMNS = 12;
+
+/**
+ * Guard against pathological nesting. Validation rejects anything deeper with
+ * a readable message, so the recursive renderer can never be handed a tree
+ * that blows the stack.
+ */
+export const MAX_COMPONENT_DEPTH = 12;

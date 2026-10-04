@@ -11,3 +11,5 @@ test-results
 playwright-report
 blob-report
 playwright/.cache
+# Playwright Chromium shared libs, installed by scripts/setup-e2e.sh
+.playwright-libs

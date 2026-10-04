@@ -16,7 +16,8 @@ export const componentDefinitions: ComponentDefinition[] = [
 			textField('subtitle', 'Subtitle', { placeholder: 'Optional subheading' })
 		],
 		defaultProps: { title: '', subtitle: '' },
-		defaultLayout: { column: 1, span: 12 }
+		defaultLayout: { column: 1, span: 12 },
+		acceptsChildren: true
 	},
 	{
 		type: 'text',

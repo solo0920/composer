@@ -46,6 +46,7 @@
 	const definition = $derived(state.definition);
 	const selected = $derived(state.selectedComponent);
 	const selectedDef = $derived(state.selectedComponentDefinition);
+	const insertTarget = $derived(state.insertParentId);
 
 	function patchProps(patch: JsonObject): void {
 		if (selected) state.updateProps(selected.id, patch);
@@ -85,7 +86,11 @@
 		</main>
 	{:else}
 		<div class="flex min-h-0 flex-1">
-			<ComponentPalette registry={componentRegistry} onadd={(type) => state.addComponent(type)} />
+			<ComponentPalette
+				registry={componentRegistry}
+				{insertTarget}
+				onadd={(type) => state.addComponent(type)}
+			/>
 
 			{#if state.view === 'visual'}
 				<Canvas

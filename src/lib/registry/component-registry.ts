@@ -13,6 +13,8 @@ export type ComponentRegistry<T extends ComponentDefinition = ComponentDefinitio
 	list(): T[];
 	get(type: string): T | undefined;
 	has(type: string): boolean;
+	/** Whether a component type may hold nested children in the component tree. */
+	acceptsChildren(type: string): boolean;
 	listByCategory(): CategoryGroup<T>[];
 };
 
@@ -27,6 +29,7 @@ export function createComponentRegistry<T extends ComponentDefinition>(
 		list: () => definitions.slice(),
 		get: (type) => byType.get(type),
 		has: (type) => byType.has(type),
+		acceptsChildren: (type) => byType.get(type)?.acceptsChildren === true,
 		listByCategory: () => {
 			const groups = new Map<string, T[]>();
 			for (const definition of definitions) {

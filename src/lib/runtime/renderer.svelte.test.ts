@@ -123,3 +123,141 @@ describe('RuntimeRenderer: definition -> registry -> component', () => {
 		expect(container.querySelectorAll('[data-testid="runtime-item"]')).toHaveLength(0);
 	});
 });
+
+describe('RuntimeRenderer: nested component tree', () => {
+	const nested = definitionWith([
+		{
+			id: 'box',
+			type: 'container',
+			props: { title: 'Outer', subtitle: '' },
+			layout: { column: 1, span: 12 },
+			children: [
+				{
+					id: 'inner-box',
+					type: 'container',
+					props: { title: 'Inner', subtitle: '' },
+					layout: { column: 1, span: 12 },
+					children: [
+						{
+							id: 'deep-text',
+							type: 'text',
+							props: { text: 'Deep leaf', variant: 'body' },
+							layout: { column: 1, span: 6 }
+						}
+					]
+				},
+				{ id: 'sibling', type: 'button', props: { label: 'Sibling', variant: 'default' }, layout: { column: 1, span: 6 } }
+			]
+		}
+	]);
+
+	it('renders every level of the tree', () => {
+		const { container } = render(RuntimeRenderer, { props: { definition: nested } });
+		const ids = [...container.querySelectorAll('[data-testid="runtime-item"]')].map((n) =>
+			n.getAttribute('data-component-id')
+		);
+		expect(ids).toEqual(['box', 'inner-box', 'deep-text', 'sibling']);
+	});
+
+	it('records the nesting depth on each node', () => {
+		const { container } = render(RuntimeRenderer, { props: { definition: nested } });
+		const depthOf = (id: string) =>
+			container.querySelector(`[data-component-id="${id}"]`)?.getAttribute('data-depth');
+		expect(depthOf('box')).toBe('0');
+		expect(depthOf('inner-box')).toBe('1');
+		expect(depthOf('deep-text')).toBe('2');
+	});
+
+	it('renders each level in its own grid using the definition column count', () => {
+		const { container } = render(RuntimeRenderer, { props: { definition: nested } });
+		const childGrids = [...container.querySelectorAll('[data-testid="runtime-children"]')];
+		expect(childGrids).toHaveLength(2);
+		for (const grid of childGrids) {
+			expect(grid.getAttribute('style')).toContain('repeat(12, minmax(0, 1fr))');
+		}
+	});
+
+	it('applies a nested component layout inside its parent grid', () => {
+		const { container } = render(RuntimeRenderer, { props: { definition: nested } });
+		expect(
+			container.querySelector('[data-component-id="sibling"]')?.getAttribute('style')
+		).toContain('grid-column: 1 / span 6');
+	});
+
+	it('delivers binding data and errors to a nested component', () => {
+		const { container } = render(RuntimeRenderer, {
+			props: {
+				definition: nested,
+				data: { 'deep-text': { ignored: 'x' } },
+				errors: { 'deep-text': 'API request failed: GET /api/mock/risk/score responded 500' }
+			}
+		});
+
+		const leaf = container.querySelector('[data-component-id="deep-text"]');
+		expect(leaf?.querySelector('[data-testid="binding-error"]')?.textContent).toBe(
+			'API request failed: GET /api/mock/risk/score responded 500'
+		);
+	});
+
+	it('renders a data component nested three levels deep with its data', () => {
+		const deep = definitionWith([
+			{
+				id: 'a',
+				type: 'container',
+				props: {},
+				layout: { column: 1, span: 12 },
+				children: [
+					{
+						id: 'b',
+						type: 'container',
+						props: {},
+						layout: { column: 1, span: 12 },
+						children: [
+							{
+								id: 'c',
+								type: 'container',
+								props: {},
+								layout: { column: 1, span: 12 },
+								children: [
+									{
+										id: 'card',
+										type: 'data-card',
+										props: { title: 'Deep Card', emptyText: 'No data' },
+										layout: { column: 1, span: 12 }
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		]);
+
+		const { container } = render(RuntimeRenderer, {
+			props: { definition: deep, data: { card: { score: 91, band: 'High' } } }
+		});
+
+		const card = container.querySelector('[data-component-id="card"]');
+		expect(card?.querySelector('h3')?.textContent).toBe('Deep Card');
+		expect([...card!.querySelectorAll('[data-testid="data-card-value"]')].map((n) => n.textContent)).toEqual(
+			['91', 'High']
+		);
+	});
+
+	it('reports an unknown component nested inside a container', () => {
+		const broken = definitionWith([
+			{
+				id: 'box',
+				type: 'container',
+				props: {},
+				layout: { column: 1, span: 12 },
+				children: [{ id: 'ghost', type: 'NopeWidget', props: {}, layout: { column: 1, span: 6 } }]
+			}
+		]);
+
+		const { container } = render(RuntimeRenderer, { props: { definition: broken } });
+		expect(container.querySelector('[data-testid="unknown-component"]')?.textContent).toBe(
+			'Unknown component: NopeWidget'
+		);
+	});
+});

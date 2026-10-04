@@ -2,6 +2,7 @@ import { createApiRegistry } from './api-registry';
 import { apiDefinitions } from './api-definitions';
 import { createComponentRegistry } from './component-registry';
 import { componentDefinitions } from './component-definitions';
+import type { RegistryLookup } from '../domain/definitions/ui-definition.schema';
 
 /**
  * Application-level registry instances. Composer code depends on these objects
@@ -9,3 +10,13 @@ import { componentDefinitions } from './component-definitions';
  */
 export const componentRegistry = createComponentRegistry(componentDefinitions);
 export const apiRegistry = createApiRegistry(apiDefinitions);
+
+/**
+ * The registries viewed through the port that domain validation depends on.
+ * One place, so every validation call site passes the same contract.
+ */
+export const registryLookup: RegistryLookup = {
+	hasComponent: (type) => componentRegistry.has(type),
+	acceptsChildren: (type) => componentRegistry.acceptsChildren(type),
+	hasApi: (id) => apiRegistry.has(id)
+};

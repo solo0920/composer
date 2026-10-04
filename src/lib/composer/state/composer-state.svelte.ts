@@ -1,12 +1,15 @@
 import type { ComponentRegistry } from '../../registry/component-registry';
 import type { ApiRegistry } from '../../registry/api-registry';
 import type { BindingDefinition } from '../../domain/bindings/binding-definition';
-import type { JsonObject, JsonValue } from '../../domain/json';
+import type { JsonObject } from '../../domain/json';
 import type { ComponentLayout, UIDefinition, UIComponentInstance } from '../../domain/definitions/ui-definition';
 import {
+	appendComponent,
 	createComponentInstance,
 	createUIDefinition,
-	findComponent,
+	findComponentById,
+	removeComponentById,
+	replaceComponentById,
 	updateLayout,
 	updateProps
 } from '../../domain/definitions/ui-definition.factory';
@@ -41,7 +44,7 @@ export class ComposerState {
 	) {}
 
 	get selectedComponent(): UIComponentInstance | undefined {
-		return findComponent(this.definition, this.selectedComponentId);
+		return findComponentById(this.definition, this.selectedComponentId);
 	}
 
 	get selectedComponentDefinition() {
@@ -49,10 +52,20 @@ export class ComposerState {
 		return instance ? this.components.get(instance.type) : undefined;
 	}
 
-	/** Replaces the whole definition (load, reset, JSON editor). */
+	/**
+	 * Where a newly added component goes: inside the selected component when
+	 * that component accepts children, otherwise at the root.
+	 */
+	get insertParentId(): string | null {
+		const instance = this.selectedComponent;
+		if (!instance) return null;
+		return this.components.acceptsChildren(instance.type) ? instance.id : null;
+	}
+
+	/** Replaces the whole definition (open, reset, JSON editor). */
 	setDefinition(definition: UIDefinition): void {
 		this.definition = definition;
-		if (!findComponent(definition, this.selectedComponentId)) {
+		if (findComponentById(definition, this.selectedComponentId) === undefined) {
 			this.selectedComponentId = null;
 		}
 		this.dirty = true;
@@ -63,22 +76,36 @@ export class ComposerState {
 		this.dirty = true;
 	}
 
-	addComponent(type: string): UIComponentInstance | undefined {
+	setColumns(columns: number): void {
+		const clamped = Math.min(Math.max(1, Math.round(columns)), 24);
+		this.definition = { ...this.definition, layout: { type: 'grid', columns: clamped } };
+		this.dirty = true;
+	}
+
+	addComponent(type: string, parentId: string | null = this.insertParentId): UIComponentInstance | undefined {
 		const componentDef = this.components.get(type);
 		if (!componentDef) return undefined;
 
+		if (parentId !== null) {
+			const parentType = this.findType(parentId);
+			if (parentType === undefined || !this.components.acceptsChildren(parentType)) return undefined;
+		}
+
 		const instance = createComponentInstance(componentDef, nextId(type), this.definition.layout.columns);
-		this.definition = { ...this.definition, components: [...this.definition.components, instance] };
-		this.selectedComponentId = instance.id;
+		this.definition = appendComponent(this.definition, instance, parentId);
+
+		// When nesting, stay on the container so that repeated palette clicks add
+		// siblings inside it. Moving the selection to the new child would push the
+		// next insert back out to the root, which makes deeper nesting unreachable
+		// by clicking alone.
+		if (parentId === null) this.selectedComponentId = instance.id;
+
 		this.dirty = true;
 		return instance;
 	}
 
 	removeComponent(id: string): void {
-		this.definition = {
-			...this.definition,
-			components: this.definition.components.filter((component) => component.id !== id)
-		};
+		this.definition = removeComponentById(this.definition, id);
 		if (this.selectedComponentId === id) this.selectedComponentId = null;
 		this.dirty = true;
 	}
@@ -88,16 +115,16 @@ export class ComposerState {
 	}
 
 	updateProps(id: string, patch: JsonObject): void {
-		this.#mutate(id, (instance) => updateProps(instance, patch));
+		this.#replace(id, (instance) => updateProps(instance, patch));
 	}
 
 	updateLayout(id: string, layout: ComponentLayout): void {
-		this.#mutate(id, (instance) => updateLayout(instance, layout, this.definition.layout.columns));
+		this.#replace(id, (instance) => updateLayout(instance, layout, this.definition.layout.columns));
 	}
 
 	/** Attaches (or replaces) a binding. Passing undefined detaches it. */
 	setBinding(id: string, binding: BindingDefinition | undefined): void {
-		this.#mutate(id, (instance) => {
+		this.#replace(id, (instance) => {
 			if (binding === undefined) {
 				const { binding: _removed, ...rest } = instance;
 				return rest as UIComponentInstance;
@@ -130,13 +157,14 @@ export class ComposerState {
 		this.dirty = false;
 	}
 
-	#mutate(id: string, transform: (instance: UIComponentInstance) => UIComponentInstance): void {
-		const index = this.definition.components.findIndex((component) => component.id === id);
-		if (index === -1) return;
+	findType(id: string): string | undefined {
+		return findComponentById(this.definition, id)?.type;
+	}
 
-		const components = this.definition.components.slice();
-		components[index] = transform(components[index]);
-		this.definition = { ...this.definition, components };
+	#replace(id: string, transform: (instance: UIComponentInstance) => UIComponentInstance): void {
+		const next = replaceComponentById(this.definition, id, transform);
+		if (next === this.definition) return;
+		this.definition = next;
 		this.dirty = true;
 	}
 }
@@ -144,8 +172,4 @@ export class ComposerState {
 /** Serialisable JSON view of the definition for the JSON editor tab. */
 export function toJson(definition: UIDefinition): string {
 	return JSON.stringify(definition, null, 2);
-}
-
-export function propsJsonValue(value: JsonValue): string {
-	return typeof value === 'string' ? value : JSON.stringify(value);
 }

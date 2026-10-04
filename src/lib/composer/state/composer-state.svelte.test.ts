@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { apiRegistry, componentRegistry } from '../../registry';
+import { apiRegistry, componentRegistry, registryLookup } from '../../registry';
 import { validateUIDefinition } from '../../domain/definitions/ui-definition.schema';
 import { ComposerState, toJson } from './composer-state.svelte';
 
-const registries = { hasComponent: componentRegistry.has, hasApi: apiRegistry.has };
 
 function makeState(): ComposerState {
 	return new ComposerState(componentRegistry, apiRegistry);
@@ -148,6 +147,148 @@ describe('ComposerState', () => {
 		expect(state.dirty).toBe(true);
 	});
 
+	it('adds a component at the root when nothing is selected', () => {
+		const state = makeState();
+		const instance = state.addComponent('text');
+		expect(state.definition.components).toHaveLength(1);
+		expect(instance?.layout).toEqual({ column: 1, span: 12 });
+	});
+
+	it('adds a component inside the selected container', () => {
+		const state = makeState();
+		const box = state.addComponent('container')!;
+		const child = state.addComponent('text')!;
+
+		expect(state.definition.components).toHaveLength(1);
+		expect(state.definition.components[0].children?.map((c) => c.id)).toEqual([child.id]);
+		expect(box.id).toBe(state.definition.components[0].id);
+	});
+
+it('stays on the container while nesting so repeated adds become siblings', () => {
+		const state = makeState();
+		state.addComponent('container');
+
+		const first = state.addComponent('text')!;
+		const second = state.addComponent('text')!;
+
+		expect(state.definition.components[0].children?.map((c) => c.id)).toEqual([first.id, second.id]);
+		// The selection is the container, not the newest child.
+		expect(state.insertParentId).toBe(state.definition.components[0].id);
+	});
+
+it('nests deeper once an inner container is selected', () => {
+		const state = makeState();
+		const outer = state.addComponent('container')!;
+		const inner = state.addComponent('container')!;
+
+		// Still inside the outer container, so this second one is a sibling.
+		expect(state.definition.components[0].children?.map((c) => c.id)).toEqual([inner.id]);
+
+		// Select the inner container, then add: the child lands one level deeper.
+		state.selectComponent(inner.id);
+		const leaf = state.addComponent('text')!;
+
+		expect(state.definition.components[0].children?.[0].children?.map((c) => c.id)).toEqual([leaf.id]);
+		expect(outer.id).toBe(state.definition.components[0].id);
+	});
+
+	it('adds at the root when the selected component cannot contain children', () => {
+		const state = makeState();
+		state.addComponent('text');
+		const second = state.addComponent('button');
+
+		expect(state.definition.components).toHaveLength(2);
+		expect(state.definition.components[0].children).toBeUndefined();
+		expect(second).toBeDefined();
+	});
+
+	it('nests several levels deep by selecting each container in turn', () => {
+		const state = makeState();
+		const a = state.addComponent('container')!;
+		const b = state.addComponent('container')!;
+
+		state.selectComponent(b.id);
+		const c = state.addComponent('text')!;
+
+		expect(state.definition.components[0].id).toBe(a.id);
+		expect(state.definition.components[0].children?.[0].id).toBe(b.id);
+		expect(state.definition.components[0].children?.[0].children?.[0].id).toBe(c.id);
+		expect(state.insertParentId).toBe(b.id);
+	});
+
+	it('refuses to nest into a component id that does not accept children', () => {
+		const state = makeState();
+		const text = state.addComponent('text')!;
+		expect(state.addComponent('button', text.id)).toBeUndefined();
+		expect(state.definition.components[0].children).toBeUndefined();
+	});
+
+	it('finds, edits and deletes a component nested several levels deep', () => {
+		const state = makeState();
+		const box = state.addComponent('container')!;
+		const inner = state.addComponent('container')!;
+		state.selectComponent(inner.id);
+		const leaf = state.addComponent('text')!;
+		state.selectComponent(leaf.id);
+
+		state.updateProps(leaf.id, { text: 'Deep edit' });
+		expect(state.selectedComponent?.props['text']).toBe('Deep edit');
+
+		state.updateLayout(leaf.id, { column: 2, span: 3 });
+		expect(state.selectedComponent?.layout).toEqual({ column: 2, span: 3 });
+
+		state.removeComponent(leaf.id);
+		expect(state.definition.components[0].children?.[0].children).toBeUndefined();
+		expect(state.selectedComponentId).toBeNull();
+		expect(box.id).toBe(state.definition.components[0].id);
+	});
+
+	it('keeps a selection that still exists after a definition replacement', () => {
+		const state = makeState();
+		state.addComponent('container');
+		const child = state.addComponent('text')!;
+		state.selectComponent(child.id);
+
+		state.setDefinition({
+			id: 'def-9',
+			version: 1,
+			name: 'Flattened',
+			layout: { type: 'grid', columns: 12 },
+			components: [{ id: child.id, type: 'text', props: {}, layout: { column: 1, span: 12 } }]
+		});
+
+		expect(state.selectedComponentId).toBe(child.id);
+	});
+
+it('drops a selection when a definition replacement removes that nested component', () => {
+		const state = makeState();
+		state.addComponent('container');
+		const child = state.addComponent('text')!;
+		state.selectComponent(child.id);
+
+		state.setDefinition({
+			id: 'def-10',
+			version: 1,
+			name: 'Without it',
+			layout: { type: 'grid', columns: 12 },
+			components: []
+		});
+
+		expect(state.selectedComponentId).toBeNull();
+	});
+
+	it('clamps the grid column count', () => {
+		const state = makeState();
+		state.setColumns(6);
+		expect(state.definition.layout.columns).toBe(6);
+		state.setColumns(0);
+		expect(state.definition.layout.columns).toBe(1);
+		state.setColumns(99);
+		expect(state.definition.layout.columns).toBe(24);
+		state.setColumns(7.6);
+		expect(state.definition.layout.columns).toBe(8);
+	});
+
 	it('clears the dirty flag on markSaved', () => {
 		const state = makeState();
 		state.addComponent('text');
@@ -168,7 +309,7 @@ describe('ComposerState', () => {
 			]
 		};
 
-		const validated = validateUIDefinition(candidate, registries);
+		const validated = validateUIDefinition(candidate, registryLookup);
 		expect(validated.ok).toBe(true);
 		if (validated.ok) {
 			state.setDefinition(validated.value);

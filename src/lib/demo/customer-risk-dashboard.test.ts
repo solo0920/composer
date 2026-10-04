@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { apiRegistry, componentRegistry } from '../registry';
+import { apiRegistry, componentRegistry, registryLookup } from '../registry';
 import { validateUIDefinition } from '../domain/definitions/ui-definition.schema';
 import { createDemoDefinition, PREVIEW_CONTEXT } from './customer-risk-dashboard';
 
-const registries = { hasComponent: componentRegistry.has, hasApi: apiRegistry.has };
 
 describe('Customer Risk Dashboard demo', () => {
-	it('is a definition that passes full validation against the registries', () => {
-		const result = validateUIDefinition(createDemoDefinition(), registries);
+	it('is a definition that passes full validation against the registryLookup', () => {
+		const result = validateUIDefinition(createDemoDefinition(), registryLookup);
 		expect(result.ok).toBe(true);
 	});
 

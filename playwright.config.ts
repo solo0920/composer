@@ -1,4 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { delimiter } from 'node:path';
+
+// Some sandboxes and CI images lack the shared libraries Playwright's Chromium
+// links against (libnspr4, libnss3, libasound). `scripts/setup-e2e.sh` unpacks
+// them into .playwright-libs/ without root. Appending it to process.env here
+// covers both the browser processes Playwright launches and the web server,
+// so no manual LD_LIBRARY_PATH export is needed.
+const localLibs = fileURLToPath(new URL('./.playwright-libs/root/usr/lib/x86_64-linux-gnu', import.meta.url));
+if (existsSync(localLibs) && !(process.env.LD_LIBRARY_PATH ?? '').includes(localLibs)) {
+	process.env.LD_LIBRARY_PATH = `${localLibs}${delimiter}${process.env.LD_LIBRARY_PATH ?? ''}`;
+}
 
 export default defineConfig({
 	testDir: 'e2e',

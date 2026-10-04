@@ -19,6 +19,11 @@ export type ComponentDefinition = {
 	defaultLayout?: { column?: number; span?: number };
 	/** Set when the component renders values resolved from its binding output. */
 	displaysBindingData?: boolean;
+	/**
+	 * When true the component may hold nested children in the component tree.
+	 * A component without this flag rejects children during validation.
+	 */
+	acceptsChildren?: boolean;
 };
 
 export function componentCategory(definition: ComponentDefinition): string {

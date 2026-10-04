@@ -1,8 +1,19 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '../result';
 import { describeExpression, parseContextRef, parsePayloadRef } from '../bindings/binding-definition';
-import type { UIDefinition } from './ui-definition';
-import { DEFAULT_GRID_COLUMNS, DEFINITION_VERSION } from './ui-definition';
+import type { UIDefinition, UIComponentInstance } from './ui-definition';
+import { DEFAULT_GRID_COLUMNS, DEFINITION_VERSION, MAX_COMPONENT_DEPTH } from './ui-definition';
+import { measureDepth, walkComponents } from './ui-definition.factory';
+
+/**
+ * What validation needs from the registries, stated as a port so that the
+ * domain does not depend on a concrete registry implementation.
+ */
+export type RegistryLookup = {
+	hasComponent(type: string): boolean;
+	acceptsChildren(type: string): boolean;
+	hasApi(id: string): boolean;
+};
 
 const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
 	z.union([
@@ -27,13 +38,16 @@ const componentLayoutSchema = z.object({
 	row: z.number().int().min(1).optional()
 });
 
-const componentInstanceSchema = z.object({
-	id: z.string().min(1),
-	type: z.string().min(1),
-	props: z.record(z.string(), jsonValueSchema),
-	layout: componentLayoutSchema,
-	binding: bindingSchema.optional()
-});
+const componentInstanceSchema: z.ZodType<UIComponentInstance> = z.lazy(() =>
+	z.object({
+		id: z.string().min(1),
+		type: z.string().min(1),
+		props: z.record(z.string(), jsonValueSchema),
+		layout: componentLayoutSchema,
+		children: z.array(componentInstanceSchema).optional(),
+		binding: bindingSchema.optional()
+	})
+) as z.ZodType<UIComponentInstance>;
 
 const uiDefinitionSchema = z.object({
 	id: z.string().min(1),
@@ -45,11 +59,6 @@ const uiDefinitionSchema = z.object({
 	}),
 	components: z.array(componentInstanceSchema)
 });
-
-export type RegistryLookup = {
-	hasComponent(type: string): boolean;
-	hasApi(id: string): boolean;
-};
 
 /**
  * Structural validation only. Used by the JSON editor, where no registries are
@@ -64,10 +73,10 @@ export function parseUIDefinition(value: unknown): Result<UIDefinition> {
 }
 
 /**
- * Full validation for external data (localStorage, hand-edited JSON): structure
- * first, then cross-references against the registries so that a definition
- * referencing a component or API that no longer exists fails with a readable
- * message instead of rendering as a silent gap.
+ * Full validation for external data (localStorage, imported files, hand-edited
+ * JSON): structure first, then cross-references against the registries, so a
+ * definition referencing a component or API that no longer exists fails with a
+ * readable message instead of rendering as a silent gap.
  */
 export function validateUIDefinition(value: unknown, registries: RegistryLookup): Result<UIDefinition> {
 	const parsed = parseUIDefinition(value);
@@ -76,44 +85,72 @@ export function validateUIDefinition(value: unknown, registries: RegistryLookup)
 	const definition = parsed.value;
 	const seenIds = new Set<string>();
 
-	for (const component of definition.components) {
-		if (seenIds.has(component.id)) {
-			return err(`Invalid UI Definition: duplicate component id "${component.id}"`);
-		}
-		seenIds.add(component.id);
+	try {
+		walkComponents(definition, ({ instance }) => {
+			if (seenIds.has(instance.id)) {
+				throw new ValidationError(`duplicate component id "${instance.id}"`);
+			}
+			seenIds.add(instance.id);
 
-		if (!registries.hasComponent(component.type)) {
-			return err(`Invalid UI Definition: unknown component "${component.type}"`);
-		}
-		if (component.layout.span > definition.layout.columns) {
-			return err(
-				`Invalid UI Definition: component "${component.id}" spans ${component.layout.span} columns but the grid has ${definition.layout.columns}`
-			);
-		}
-		if (component.layout.column > definition.layout.columns) {
-			return err(
-				`Invalid UI Definition: component "${component.id}" starts at column ${component.layout.column} but the grid has ${definition.layout.columns} columns`
-			);
-		}
-		if (component.binding) {
-			if (!registries.hasApi(component.binding.api)) {
-				return err(`Invalid UI Definition: unknown API "${component.binding.api}"`);
+			if (!registries.hasComponent(instance.type)) {
+				throw new ValidationError(`unknown component "${instance.type}"`);
 			}
-			for (const [key, expression] of Object.entries(component.binding.input ?? {})) {
-				if (parseContextRef(expression.trim()) === undefined) {
-					return err(`Invalid binding input "${key}": ${describeExpression(expression)}`);
+			if (instance.layout.span > definition.layout.columns) {
+				throw new ValidationError(
+					`component "${instance.id}" spans ${instance.layout.span} columns but the grid has ${definition.layout.columns}`
+				);
+			}
+			if (instance.layout.column > definition.layout.columns) {
+				throw new ValidationError(
+					`component "${instance.id}" starts at column ${instance.layout.column} but the grid has ${definition.layout.columns} columns`
+				);
+			}
+			if (
+				instance.children &&
+				instance.children.length > 0 &&
+				!registries.acceptsChildren(instance.type)
+			) {
+				throw new ValidationError(`component "${instance.type}" cannot contain children`);
+			}
+			if (instance.binding) {
+				if (!registries.hasApi(instance.binding.api)) {
+					throw new ValidationError(`unknown API "${instance.binding.api}"`);
+				}
+				for (const [key, expression] of Object.entries(instance.binding.input ?? {})) {
+					if (parseContextRef(expression.trim()) === undefined) {
+						throw new ValidationError(
+							`invalid binding input "${key}": ${describeExpression(expression)}`
+						);
+					}
+				}
+				for (const [key, expression] of Object.entries(instance.binding.output ?? {})) {
+					if (parsePayloadRef(expression.trim()) === undefined) {
+						throw new ValidationError(
+							`invalid binding output "${key}": ${describeExpression(expression)}`
+						);
+					}
 				}
 			}
-			for (const [key, expression] of Object.entries(component.binding.output ?? {})) {
-				if (parsePayloadRef(expression.trim()) === undefined) {
-					return err(`Invalid binding output "${key}": ${describeExpression(expression)}`);
-				}
-			}
+		});
+	} catch (cause) {
+		if (cause instanceof ValidationError) {
+			return err(`Invalid UI Definition: ${cause.message}`);
 		}
+		throw cause;
+	}
+
+	const depth = measureDepth(definition);
+	if (depth > MAX_COMPONENT_DEPTH) {
+		return err(
+			`Invalid UI Definition: component nesting is ${depth} levels deep, the maximum is ${MAX_COMPONENT_DEPTH}`
+		);
 	}
 
 	return ok(definition);
 }
+
+/** Thrown internally to abort validation with a message that needs no path prefix. */
+class ValidationError extends Error {}
 
 function formatIssues(error: z.ZodError): string {
 	const issues = error.issues.slice(0, 5).map((issue) => {
@@ -124,4 +161,4 @@ function formatIssues(error: z.ZodError): string {
 	return `Invalid UI Definition: ${issues.join('; ')}${suffix}`;
 }
 
-export { DEFAULT_GRID_COLUMNS, DEFINITION_VERSION };
+export { DEFAULT_GRID_COLUMNS, DEFINITION_VERSION, MAX_COMPONENT_DEPTH };

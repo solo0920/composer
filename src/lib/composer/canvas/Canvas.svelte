@@ -1,11 +1,10 @@
 <script lang="ts">
 	import type { UIDefinition } from '$lib/domain/definitions/ui-definition';
-	import { svelteComponentRegistry } from '$lib/runtime/renderer-registry.svelte';
+	import CanvasNode from './CanvasNode.svelte';
 
 	/**
-	 * Composer canvas: an editable 12-column grid. It renders each component with
-	 * its registry renderer so the Canvas and the Runtime Preview always agree
-	 * about how a component looks — there is only one Preview layout.
+	 * Composer canvas: an editable grid of the component tree. Select a cell to
+	 * edit it in the Inspector; clicking empty space clears the selection.
 	 */
 	let {
 		definition,
@@ -40,47 +39,12 @@
 			}}
 		>
 			{#each definition.components as instance (instance.id)}
-				{@const resolved = svelteComponentRegistry.get(instance.type)}
-				{@const isSelected = instance.id === selectedId}
-				<div
-					data-canvas-item
-					data-testid="canvas-item"
-					data-component-id={instance.id}
-					data-component-type={instance.type}
-					class="min-w-0 cursor-pointer rounded-md text-left ring-offset-2 transition-shadow
-						{isSelected ? 'ring-2 ring-ring' : 'hover:ring-1 hover:ring-ring/40'}"
-					style:grid-column="{instance.layout.column} / span {instance.layout.span}"
-					style:grid-row={instance.layout.row ?? 'auto'}
-					onclick={() => onselect(instance.id)}
-					onkeydown={(event) => {
-						if (event.key === 'Enter' || event.key === ' ') {
-							event.preventDefault();
-							onselect(instance.id);
-						}
-					}}
-					role="button"
-					tabindex="0"
-					aria-pressed={isSelected}
-				>
-					{#if resolved}
-						{@const runtimeProps = { props: instance.props, data: {} }}
-						<resolved.renderer {...runtimeProps} />
-					{:else}
-						<p class="text-sm text-destructive">Unknown component: {instance.type}</p>
-					{/if}
-
-					<div class="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-						<span class="rounded bg-muted px-1 py-0.5 font-mono">{instance.id}</span>
-						<span>
-							col {instance.layout.column} · span {instance.layout.span}
-						</span>
-						{#if instance.binding}
-							<span class="rounded bg-muted px-1 py-0.5 font-mono text-foreground">
-								{instance.binding.api}
-							</span>
-						{/if}
-					</div>
-				</div>
+				<CanvasNode
+					{instance}
+					columns={definition.layout.columns}
+					{selectedId}
+					{onselect}
+				/>
 			{/each}
 		</div>
 	{/if}

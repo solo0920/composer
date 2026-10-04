@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiRegistry, componentRegistry } from '../registry';
+import { registryLookup } from '../registry';
 import { createDemoDefinition } from '../demo/customer-risk-dashboard';
 import {
 	clearDefinition,
@@ -9,7 +9,6 @@ import {
 	type DefinitionStorage
 } from './definition-store';
 
-const registries = { hasComponent: componentRegistry.has, hasApi: apiRegistry.has };
 
 function memoryStorage(initial: Record<string, string> = {}): DefinitionStorage & { map: Map<string, string> } {
 	const map = new Map(Object.entries(initial));
@@ -28,7 +27,7 @@ describe('saveDefinition', () => {
 
 		expect(saveDefinition(storage, definition).ok).toBe(true);
 
-		const loaded = loadDefinition(storage, registries);
+		const loaded = loadDefinition(storage, registryLookup);
 		expect(loaded.ok).toBe(true);
 		if (loaded.ok) expect(loaded.value).toEqual(definition);
 	});
@@ -55,12 +54,12 @@ describe('saveDefinition', () => {
 
 describe('loadDefinition', () => {
 	it('reports when nothing has been saved', () => {
-		const result = loadDefinition(memoryStorage(), registries);
+		const result = loadDefinition(memoryStorage(), registryLookup);
 		expect(result).toEqual({ ok: false, error: 'No saved definition found.' });
 	});
 
 	it('rejects stored JSON that is not valid JSON', () => {
-		const result = loadDefinition(memoryStorage({ [STORAGE_KEY]: '{oops' }), registries);
+		const result = loadDefinition(memoryStorage({ [STORAGE_KEY]: '{oops' }), registryLookup);
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error).toMatch(/^Saved definition is not valid JSON: /);
 	});
@@ -70,7 +69,7 @@ describe('loadDefinition', () => {
 			...createDemoDefinition(),
 			components: [{ id: 'x', type: 'RiskScore', props: {}, layout: { column: 1, span: 6 } }]
 		};
-		const result = loadDefinition(memoryStorage({ [STORAGE_KEY]: JSON.stringify(tampered) }), registries);
+		const result = loadDefinition(memoryStorage({ [STORAGE_KEY]: JSON.stringify(tampered) }), registryLookup);
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
 			expect(result.error).toBe('Invalid UI Definition: unknown component "RiskScore"');
@@ -85,7 +84,7 @@ describe('loadDefinition', () => {
 				index === 1 ? { ...component, binding: { api: 'customer.getSecret' } } : component
 			)
 		};
-		const result = loadDefinition(memoryStorage({ [STORAGE_KEY]: JSON.stringify(tampered) }), registries);
+		const result = loadDefinition(memoryStorage({ [STORAGE_KEY]: JSON.stringify(tampered) }), registryLookup);
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error).toBe('Invalid UI Definition: unknown API "customer.getSecret"');
 	});
@@ -100,9 +99,9 @@ describe('loadDefinition', () => {
 					: component
 			)
 		};
-		const result = loadDefinition(memoryStorage({ [STORAGE_KEY]: JSON.stringify(tampered) }), registries);
+		const result = loadDefinition(memoryStorage({ [STORAGE_KEY]: JSON.stringify(tampered) }), registryLookup);
 		expect(result.ok).toBe(false);
-		if (!result.ok) expect(result.error).toMatch(/^Invalid binding input "customerId": /);
+		if (!result.ok) expect(result.error).toMatch(/^Invalid UI Definition: invalid binding input "customerId": /);
 	});
 
 	it('reports a read failure instead of throwing', () => {
@@ -113,7 +112,7 @@ describe('loadDefinition', () => {
 			setItem: () => {},
 			removeItem: () => {}
 		};
-		expect(loadDefinition(failing, registries)).toEqual({
+		expect(loadDefinition(failing, registryLookup)).toEqual({
 			ok: false,
 			error: 'Could not read stored definition: SecurityError'
 		});
@@ -126,7 +125,7 @@ describe('clearDefinition', () => {
 		saveDefinition(storage, createDemoDefinition());
 		expect(clearDefinition(storage)).toEqual({ ok: true, value: null });
 		expect(storage.getItem(STORAGE_KEY)).toBeNull();
-		expect(loadDefinition(storage, registries).ok).toBe(false);
+		expect(loadDefinition(storage, registryLookup).ok).toBe(false);
 	});
 
 	it('reports a removal failure instead of throwing', () => {

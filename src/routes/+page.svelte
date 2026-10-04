@@ -9,12 +9,11 @@
 		loadDefinition,
 		saveDefinition
 	} from '$lib/persistence/definition-store';
-	import { apiRegistry, componentRegistry } from '$lib/registry';
+	import { apiRegistry, componentRegistry, registryLookup } from '$lib/registry';
 	import { createApiClient } from '$lib/runtime/api-client';
 	import { PreviewRuntime } from '$lib/runtime/preview-runtime.svelte';
 
-	const registries = { hasComponent: componentRegistry.has, hasApi: apiRegistry.has };
-
+	
 	const composer = new ComposerState(componentRegistry, apiRegistry);
 	const previewRuntime = new PreviewRuntime(apiRegistry, createApiClient());
 
@@ -36,7 +35,7 @@
 	});
 
 	onMount(() => {
-		const loaded = loadDefinition(localStorage, registries);
+		const loaded = loadDefinition(localStorage, registryLookup);
 		if (loaded.ok) {
 			composer.setDefinition(loaded.value);
 			composer.markSaved();
@@ -58,7 +57,7 @@
 	}
 
 	function load(): void {
-		const result = loadDefinition(localStorage, registries);
+		const result = loadDefinition(localStorage, registryLookup);
 		if (result.ok) {
 			composer.setDefinition(result.value);
 			composer.markSaved();
@@ -84,7 +83,7 @@
 			return;
 		}
 
-		const validated = validateUIDefinition(parsed, registries);
+		const validated = validateUIDefinition(parsed, registryLookup);
 		if (!validated.ok) {
 			jsonError = validated.error;
 			return;

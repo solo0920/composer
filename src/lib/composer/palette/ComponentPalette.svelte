@@ -8,9 +8,12 @@
 	 */
 	let {
 		registry,
+		insertTarget,
 		onadd
 	}: {
 		registry: ComponentRegistry;
+		/** Label of the container the next added component will land in, if any. */
+		insertTarget?: string | null;
 		onadd: (type: string) => void;
 	} = $props();
 
@@ -19,7 +22,14 @@
 
 <aside class="flex w-56 shrink-0 flex-col gap-4 overflow-y-auto border-r border-border p-3">
 	<div>
-		<h2 class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Components</h2>
+		<h2 class="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Components</h2>
+		<p class="text-xs text-muted-foreground" data-testid="palette-insert-target">
+			{#if insertTarget}
+				Adding inside <span class="font-mono text-foreground">{insertTarget}</span>
+			{:else}
+				Adding at the root level
+			{/if}
+		</p>
 	</div>
 
 	{#each groups as group (group.category)}
@@ -38,6 +48,9 @@
 						<span class="text-sm font-medium">{component.label}</span>
 						{#if component.description}
 							<span class="text-xs font-normal text-muted-foreground">{component.description}</span>
+						{/if}
+						{#if component.acceptsChildren}
+							<span class="text-[10px] font-normal text-muted-foreground">accepts children</span>
 						{/if}
 					</span>
 				</Button>
